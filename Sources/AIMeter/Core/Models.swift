@@ -1,28 +1,42 @@
 import Foundation
 
+struct MenuBarAppearanceSettings: Codable, Equatable {
+    var showProgressBar: Bool
+    var showCursorAutoAPIPercentages: Bool
+
+    static let `default` = MenuBarAppearanceSettings(
+        showProgressBar: true,
+        showCursorAutoAPIPercentages: false
+    )
+}
+
 struct AppSettings: Codable, Equatable {
     var pollIntervalSeconds: TimeInterval
     var hasCompletedInitialSetup: Bool
     var cursor: CursorSettings
     var claude: ClaudeSettings
+    var menuBar: MenuBarAppearanceSettings
 
     private enum CodingKeys: String, CodingKey {
         case pollIntervalSeconds
         case hasCompletedInitialSetup
         case cursor
         case claude
+        case menuBar
     }
 
     init(
         pollIntervalSeconds: TimeInterval,
         hasCompletedInitialSetup: Bool,
         cursor: CursorSettings,
-        claude: ClaudeSettings
+        claude: ClaudeSettings,
+        menuBar: MenuBarAppearanceSettings = .default
     ) {
         self.pollIntervalSeconds = pollIntervalSeconds
         self.hasCompletedInitialSetup = hasCompletedInitialSetup
         self.cursor = cursor
         self.claude = claude
+        self.menuBar = menuBar
     }
 
     init(from decoder: Decoder) throws {
@@ -38,6 +52,7 @@ struct AppSettings: Codable, Equatable {
         ) ?? Self.default.hasCompletedInitialSetup
         cursor = try container.decodeIfPresent(CursorSettings.self, forKey: .cursor) ?? .default
         claude = try container.decodeIfPresent(ClaudeSettings.self, forKey: .claude) ?? .default
+        menuBar = try container.decodeIfPresent(MenuBarAppearanceSettings.self, forKey: .menuBar) ?? .default
     }
 
     func encode(to encoder: Encoder) throws {
@@ -46,13 +61,15 @@ struct AppSettings: Codable, Equatable {
         try container.encode(hasCompletedInitialSetup, forKey: .hasCompletedInitialSetup)
         try container.encode(cursor, forKey: .cursor)
         try container.encode(claude, forKey: .claude)
+        try container.encode(menuBar, forKey: .menuBar)
     }
 
     static let `default` = AppSettings(
         pollIntervalSeconds: 300,
         hasCompletedInitialSetup: false,
         cursor: .default,
-        claude: .default
+        claude: .default,
+        menuBar: .default
     )
 }
 

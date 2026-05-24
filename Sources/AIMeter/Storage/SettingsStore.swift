@@ -56,6 +56,12 @@ final class SettingsStore: ObservableObject {
         settings.claude.usagePageURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    func setShowCursorAutoAPIPercentages(_ enabled: Bool) {
+        var updated = settings
+        updated.menuBar.showCursorAutoAPIPercentages = enabled
+        settings = updated
+    }
+
     private func persist() {
         guard let encoded = try? JSONEncoder().encode(settings) else {
             return
@@ -71,7 +77,17 @@ private extension AppSettings {
             pollIntervalSeconds: max(300, pollIntervalSeconds),
             hasCompletedInitialSetup: hasCompletedInitialSetup,
             cursor: cursor.mergedWithDefaults,
-            claude: claude.mergedWithDefaults
+            claude: claude.mergedWithDefaults,
+            menuBar: menuBar.mergedWithDefaults
+        )
+    }
+}
+
+private extension MenuBarAppearanceSettings {
+    var mergedWithDefaults: MenuBarAppearanceSettings {
+        MenuBarAppearanceSettings(
+            showProgressBar: true,
+            showCursorAutoAPIPercentages: showCursorAutoAPIPercentages
         )
     }
 }

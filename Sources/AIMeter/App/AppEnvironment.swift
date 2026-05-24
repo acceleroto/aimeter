@@ -25,6 +25,7 @@ final class AppEnvironment {
     }()
     lazy var menuBarController: MenuBarController = {
         MenuBarController(
+            settingsStore: settingsStore,
             dashboardStore: dashboardStore,
             cursorUsageCoordinator: cursorUsageCoordinator,
             claudeUsageCoordinator: claudeUsageCoordinator,

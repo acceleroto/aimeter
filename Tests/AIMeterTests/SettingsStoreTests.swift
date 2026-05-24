@@ -47,6 +47,62 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.settings.cursor.usagePageURL, CursorSettings.default.usagePageURL)
     }
 
+    func testMenuBarAppearanceSettingsPersistAcrossReloads() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let firstStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertFalse(firstStore.settings.menuBar.showCursorAutoAPIPercentages)
+        XCTAssertTrue(firstStore.settings.menuBar.showProgressBar)
+
+        firstStore.settings.menuBar.showCursorAutoAPIPercentages = true
+
+        let secondStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertTrue(secondStore.settings.menuBar.showCursorAutoAPIPercentages)
+        XCTAssertTrue(secondStore.settings.menuBar.showProgressBar)
+    }
+
+    func testStoredDisabledProgressBarIsForcedOnDuringMerge() throws {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let settings = AppSettings(
+            pollIntervalSeconds: 300,
+            hasCompletedInitialSetup: false,
+            cursor: .default,
+            claude: .default,
+            menuBar: MenuBarAppearanceSettings(showProgressBar: false, showCursorAutoAPIPercentages: true)
+        )
+        let encoded = try JSONEncoder().encode(settings)
+        userDefaults.set(encoded, forKey: "aimeter.settings")
+
+        let store = SettingsStore(userDefaults: userDefaults)
+
+        XCTAssertTrue(store.settings.menuBar.showProgressBar)
+        XCTAssertTrue(store.settings.menuBar.showCursorAutoAPIPercentages)
+    }
+
+    func testExistingSettingsWithoutMenuBarDefaultMenuBarAppearance() throws {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let encoded = try JSONEncoder().encode(
+            LegacyAppSettings(
+                pollIntervalSeconds: 600,
+                hasCompletedInitialSetup: true,
+                cursor: CursorSettings(usagePageURL: "https://cursor.com/settings/account")
+            )
+        )
+        userDefaults.set(encoded, forKey: "aimeter.settings")
+
+        let store = SettingsStore(userDefaults: userDefaults)
+
+        XCTAssertEqual(store.settings.menuBar, .default)
+    }
+
     func testExistingSettingsWithoutClaudeKeepCursorConfiguration() throws {
         let suiteName = #function
         let userDefaults = UserDefaults(suiteName: suiteName)!

@@ -25,6 +25,21 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Menu Bar") {
+                Toggle("Usage progress bar", isOn: showProgressBarBinding)
+                    .disabled(true)
+
+                Text("Always shown for now.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Cursor Auto & API percentages", isOn: showCursorAutoAPIPercentagesBinding)
+
+                Text("Shows Auto and API usage to the right of the menu bar icon (e.g. 5.6%/7.8%).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             providerSettingsSection(
                 snapshot: state.cursorSnapshot,
                 coordinator: cursorUsageCoordinator,
@@ -50,7 +65,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 520, minHeight: 520)
+        .frame(minWidth: 520, minHeight: 560)
         .padding(12)
         .onAppear {
             launchAtLoginController.refresh()
@@ -68,6 +83,20 @@ struct SettingsView: View {
         Binding(
             get: { settingsStore.settings.pollIntervalSeconds },
             set: { settingsStore.setPollInterval(seconds: $0) }
+        )
+    }
+
+    private var showProgressBarBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.showProgressBar },
+            set: { settingsStore.settings.menuBar.showProgressBar = $0 }
+        )
+    }
+
+    private var showCursorAutoAPIPercentagesBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.showCursorAutoAPIPercentages },
+            set: { settingsStore.setShowCursorAutoAPIPercentages($0) }
         )
     }
 

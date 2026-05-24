@@ -4,6 +4,7 @@ import Combine
 
 @MainActor
 final class MenuBarController {
+    private let settingsStore: SettingsStore
     private let dashboardStore: DashboardStore
     private let cursorUsageCoordinator: CursorUsageCoordinator
     private let claudeUsageCoordinator: ClaudeUsageCoordinator
@@ -16,11 +17,13 @@ final class MenuBarController {
     private var globalEventMonitor: Any?
 
     init(
+        settingsStore: SettingsStore,
         dashboardStore: DashboardStore,
         cursorUsageCoordinator: CursorUsageCoordinator,
         claudeUsageCoordinator: ClaudeUsageCoordinator,
         settingsWindowController: SettingsWindowController
     ) {
+        self.settingsStore = settingsStore
         self.dashboardStore = dashboardStore
         self.cursorUsageCoordinator = cursorUsageCoordinator
         self.claudeUsageCoordinator = claudeUsageCoordinator
@@ -31,7 +34,8 @@ final class MenuBarController {
         configureStatusItem()
         configurePopover()
         bindDashboard()
-        updateStatusItem(dashboardStore.state)
+        bindSettings()
+        updateStatusItem(state: dashboardStore.state, settings: settingsStore.settings)
     }
 
     private func configureStatusItem() {
@@ -83,24 +87,66 @@ final class MenuBarController {
     private func bindDashboard() {
         dashboardStore.$state
             .sink { [weak self] state in
-                self?.updateStatusItem(state)
+                guard let self else { return }
+                self.updateStatusItem(state: state, settings: self.settingsStore.settings)
             }
             .store(in: &cancellables)
     }
 
-    private func updateStatusItem(_ state: DashboardState) {
+    private func bindSettings() {
+        settingsStore.$settings
+            .sink { [weak self] settings in
+                guard let self else { return }
+                self.updateStatusItem(state: self.dashboardStore.state, settings: settings)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updateStatusItem(state: DashboardState, settings: AppSettings) {
         guard let button = statusItem.button else { return }
 
         popover.contentSize = preferredPopoverSize(for: state)
 
-        button.image = StatusBarImageFactory.image(
-            progress: state.menuBarProgressPercent / 100,
-            state: primaryConnectionState(for: state)
-        )
-        button.title = ""
-        button.attributedTitle = NSAttributedString(string: "")
+        if settings.menuBar.showProgressBar {
+            button.image = StatusBarImageFactory.image(
+                progress: state.menuBarProgressPercent / 100,
+                state: primaryConnectionState(for: state)
+            )
+        } else {
+            button.image = nil
+        }
 
-        button.toolTip = tooltip(for: state)
+        if let suffix = menuBarSuffix(for: state, settings: settings) {
+            button.imagePosition = .imageLeading
+            button.attributedTitle = NSAttributedString(string: "")
+            // Use plain title so the status bar draws adaptive light/dark text.
+            // Do not assign button.title = "" after setting text — that clears the label.
+            button.title = " \(suffix)"
+        } else {
+            button.imagePosition = .imageOnly
+            button.attributedTitle = NSAttributedString(string: "")
+            button.title = ""
+        }
+
+        button.needsDisplay = true
+        statusItem.length = NSStatusItem.variableLength
+        button.toolTip = tooltip(for: state, settings: settings)
+    }
+
+    private func menuBarSuffix(for state: DashboardState, settings: AppSettings) -> String? {
+        guard settings.menuBar.showCursorAutoAPIPercentages else {
+            return nil
+        }
+
+        let cursor = state.cursorSnapshot
+        guard cursor.connectionState != .disconnected, cursor.hasSuccessfulSync else {
+            return nil
+        }
+
+        return DisplayFormatting.cursorAutoAPISuffix(
+            auto: cursor.autoUsedPercent,
+            api: cursor.apiUsedPercent
+        )
     }
 
     private func preferredPopoverSize(for state: DashboardState) -> NSSize {
@@ -115,13 +161,13 @@ final class MenuBarController {
         return NSSize(width: 380, height: height)
     }
 
-    private func tooltip(for state: DashboardState) -> String {
+    private func tooltip(for state: DashboardState, settings: AppSettings) -> String {
         let connectedSnapshots = state.connectedProviderSnapshots
         guard !connectedSnapshots.isEmpty else {
             return "AIMeter: Connect Cursor or Claude"
         }
 
-        return connectedSnapshots
+        var lines = connectedSnapshots
             .map { snapshot in
                 if let progressPercent = snapshot.progressPercent, snapshot.connectionState == .connected {
                     return "\(snapshot.provider.displayName): \(DisplayFormatting.percent(progressPercent)) - \(snapshot.planLabel)"
@@ -129,7 +175,17 @@ final class MenuBarController {
 
                 return "\(snapshot.provider.displayName): \(snapshot.connectionState.displayText)"
             }
-            .joined(separator: "\n")
+
+        if settings.menuBar.showCursorAutoAPIPercentages {
+            let cursor = state.cursorSnapshot
+            if cursor.connectionState != .disconnected, cursor.hasSuccessfulSync {
+                lines.append(
+                    "Cursor Auto: \(DisplayFormatting.percent(cursor.autoUsedPercent)), API: \(DisplayFormatting.percent(cursor.apiUsedPercent))"
+                )
+            }
+        }
+
+        return lines.joined(separator: "\n")
     }
 
     private func primaryConnectionState(for state: DashboardState) -> ProviderConnectionState {

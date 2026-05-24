@@ -2,6 +2,10 @@ import Foundation
 
 enum DisplayFormatting {
     static func percent(_ value: Double) -> String {
+        compactPercent(value)
+    }
+
+    static func compactPercent(_ value: Double) -> String {
         let clamped = min(max(value, 0), 100)
 
         if abs(clamped.rounded() - clamped) < 0.05 {
@@ -9,6 +13,10 @@ enum DisplayFormatting {
         }
 
         return String(format: "%.1f%%", clamped)
+    }
+
+    static func cursorAutoAPISuffix(auto: Double, api: Double) -> String {
+        "\(compactPercent(auto))/\(compactPercent(api))"
     }
 
     static func relativeTimestamp(_ date: Date?) -> String {
