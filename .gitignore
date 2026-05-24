@@ -13,5 +13,8 @@ xcuserdata/
 *.dSYM/
 *.dSYM.zip
 
+# Cursor IDE (editor metadata — not project source)
+.cursor/
+
 # Local PR draft (not for the fork)
 pr-upstream-description.md
