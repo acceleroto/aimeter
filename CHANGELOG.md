@@ -4,6 +4,16 @@ All notable changes to AIMeter will be documented in this file.
 
 This project follows semantic versioning while it is practical for a small macOS utility.
 
+## Unreleased
+
+### Added
+
+- General setting to hide the menu bar progress bar when Cursor Auto and API percentages are shown instead.
+
+### Changed
+
+- Menu bar display always keeps at least one of the progress bar or Cursor Auto/API percentages visible; percentages-only mode shows `--/--` when Cursor has not synced yet.
+
 ## [0.4.0] - 2026-05-07
 
 ### Added

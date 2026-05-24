@@ -13,6 +13,7 @@
 		16E9ED501E3DAEA0DBB88F6F /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E341916E209D9871F82BB53 /* AppEnvironment.swift */; };
 		171F47E1D3B27D9B6E45B003 /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD89BA7914EC59EAF85F0820 /* SettingsStoreTests.swift */; };
 		1B8E4D62F860050891233980 /* CursorUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672713F6A8CA6AF0D040A1CA /* CursorUsageClient.swift */; };
+		2AC22FAC20C723F114680CBD /* MenuBarDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF069AB9DBABDF9A5DF577CF /* MenuBarDisplay.swift */; };
 		2B562E1E93E18116D50951A7 /* CursorWebViewScraper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D2F543206D02BDE4304949 /* CursorWebViewScraper.swift */; };
 		2CA8FA61A5C20556C7E5D3A4 /* ClaudeDashboardClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C775C6F21F776CFC85042C2 /* ClaudeDashboardClient.swift */; };
 		33B2ADEF3FE285F96B631DF4 /* DashboardStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 857977CEBB2AD3B77F779BE0 /* DashboardStoreTests.swift */; };
@@ -45,6 +46,7 @@
 		E5A509FE67E9447954D7EBAE /* AIMeterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF2E78ABB85C659AC70EEC0 /* AIMeterApp.swift */; };
 		F4E60418E434356BCE5AD04C /* ClaudeDashboardParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76EE46FC0F25079640B7181 /* ClaudeDashboardParserTests.swift */; };
 		F8D950FF33F268122E482D7C /* MenuPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF579E7263249E0D5E4240A1 /* MenuPopoverView.swift */; };
+		FE8D8CE50F5EA095BB631D00 /* MenuBarDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E669662E352E03676AB8D447 /* MenuBarDisplayTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,12 +92,14 @@
 		AD89BA7914EC59EAF85F0820 /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		B3E79D6B78A53D1211494926 /* LaunchAtLoginControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginControllerTests.swift; sourceTree = "<group>"; };
 		B83BFABBC211E9D2B6B80607 /* CursorDashboardClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorDashboardClientTests.swift; sourceTree = "<group>"; };
+		BF069AB9DBABDF9A5DF577CF /* MenuBarDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDisplay.swift; sourceTree = "<group>"; };
 		C420458D523C4CEB80EC47EC /* ClaudeSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSessionManager.swift; sourceTree = "<group>"; };
 		D76EE46FC0F25079640B7181 /* ClaudeDashboardParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeDashboardParserTests.swift; sourceTree = "<group>"; };
 		D9959F4FD7643E380D38B2B5 /* CursorSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorSessionManager.swift; sourceTree = "<group>"; };
 		DA5C6BC0AD596AED83C47006 /* DashboardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStore.swift; sourceTree = "<group>"; };
 		DA5F8994ED80530285527F1F /* CursorDashboardClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorDashboardClient.swift; sourceTree = "<group>"; };
 		E619902272D73EAA21BE7E86 /* CursorDashboardParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorDashboardParserTests.swift; sourceTree = "<group>"; };
+		E669662E352E03676AB8D447 /* MenuBarDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDisplayTests.swift; sourceTree = "<group>"; };
 		FE73A1851218DA4462AA95A8 /* AIMeter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIMeter.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FF579E7263249E0D5E4240A1 /* MenuPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPopoverView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -145,6 +149,7 @@
 				DA5C6BC0AD596AED83C47006 /* DashboardStore.swift */,
 				220E0695EAC46DC1F85AFF6A /* DisplayFormatting.swift */,
 				4AED8C1F249B87F016FE1950 /* LaunchAtLoginController.swift */,
+				BF069AB9DBABDF9A5DF577CF /* MenuBarDisplay.swift */,
 				7F9D2904EFDABD5DF920C626 /* Models.swift */,
 			);
 			path = Core;
@@ -192,6 +197,7 @@
 				857977CEBB2AD3B77F779BE0 /* DashboardStoreTests.swift */,
 				81D777AC3C62541D3AC22FF0 /* DisplayFormattingTests.swift */,
 				B3E79D6B78A53D1211494926 /* LaunchAtLoginControllerTests.swift */,
+				E669662E352E03676AB8D447 /* MenuBarDisplayTests.swift */,
 				AD89BA7914EC59EAF85F0820 /* SettingsStoreTests.swift */,
 			);
 			path = AIMeterTests;
@@ -352,6 +358,7 @@
 				16971F3175C89B2A15EFB518 /* DisplayFormatting.swift in Sources */,
 				7B529974CA70C28055608579 /* LaunchAtLoginController.swift in Sources */,
 				C4A52A88F70241337DA598B2 /* MenuBarController.swift in Sources */,
+				2AC22FAC20C723F114680CBD /* MenuBarDisplay.swift in Sources */,
 				F8D950FF33F268122E482D7C /* MenuPopoverView.swift in Sources */,
 				AA2B2846B0C47F67E0671F16 /* Models.swift in Sources */,
 				8E5860905ABD07228B3EA4F1 /* SettingsStore.swift in Sources */,
@@ -375,6 +382,7 @@
 				33B2ADEF3FE285F96B631DF4 /* DashboardStoreTests.swift in Sources */,
 				91A55143369318F7D674B8F9 /* DisplayFormattingTests.swift in Sources */,
 				DB75591FE772270B8B33ADA3 /* LaunchAtLoginControllerTests.swift in Sources */,
+				FE8D8CE50F5EA095BB631D00 /* MenuBarDisplayTests.swift in Sources */,
 				171F47E1D3B27D9B6E45B003 /* SettingsStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

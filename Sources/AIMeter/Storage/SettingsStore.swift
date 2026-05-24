@@ -56,9 +56,29 @@ final class SettingsStore: ObservableObject {
         settings.claude.usagePageURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    func setShowProgressBar(_ enabled: Bool) {
+        var updated = settings
+        var menuBar = updated.menuBar.normalized()
+
+        if !enabled, !menuBar.showCursorAutoAPIPercentages {
+            menuBar.showCursorAutoAPIPercentages = true
+        }
+
+        menuBar.showProgressBar = enabled
+        updated.menuBar = menuBar.normalized()
+        settings = updated
+    }
+
     func setShowCursorAutoAPIPercentages(_ enabled: Bool) {
         var updated = settings
-        updated.menuBar.showCursorAutoAPIPercentages = enabled
+        var menuBar = updated.menuBar.normalized()
+
+        if !enabled, !menuBar.showProgressBar {
+            menuBar.showProgressBar = true
+        }
+
+        menuBar.showCursorAutoAPIPercentages = enabled
+        updated.menuBar = menuBar.normalized()
         settings = updated
     }
 
@@ -85,10 +105,7 @@ private extension AppSettings {
 
 private extension MenuBarAppearanceSettings {
     var mergedWithDefaults: MenuBarAppearanceSettings {
-        MenuBarAppearanceSettings(
-            showProgressBar: true,
-            showCursorAutoAPIPercentages: showCursorAutoAPIPercentages
-        )
+        normalized()
     }
 }
 

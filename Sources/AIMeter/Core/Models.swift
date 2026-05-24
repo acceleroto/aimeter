@@ -8,6 +8,20 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
         showProgressBar: true,
         showCursorAutoAPIPercentages: false
     )
+
+    var hasAtLeastOneDisplayOption: Bool {
+        showProgressBar || showCursorAutoAPIPercentages
+    }
+
+    func normalized() -> MenuBarAppearanceSettings {
+        guard !hasAtLeastOneDisplayOption else {
+            return self
+        }
+
+        var copy = self
+        copy.showProgressBar = true
+        return copy
+    }
 }
 
 struct AppSettings: Codable, Equatable {

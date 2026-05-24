@@ -15,7 +15,7 @@ AIMeter is a minimal macOS menu bar app for tracking personal Cursor and Claude 
 - Tracks Claude plan usage, reset time, and model limits when available.
 - Uses local web sessions, so no API key is required.
 - Keeps the latest successful usage snapshot visible if a background refresh fails.
-- Optional menu bar display of Cursor Auto and API usage percentages beside the progress bar.
+- Optional menu bar display of Cursor Auto and API usage percentages beside the progress bar, or instead of it when the progress bar is hidden in Settings.
 
 ## Screenshots
 

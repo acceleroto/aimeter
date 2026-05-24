@@ -18,6 +18,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Toggle("Show usage progress bar", isOn: showProgressBarBinding)
+
+                Text("Turn off only if Cursor Auto & API percentages are shown in the menu bar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 if let statusMessage = launchAtLoginController.statusMessage {
                     Text(statusMessage)
                         .font(.caption)
@@ -69,6 +75,13 @@ struct SettingsView: View {
         Binding(
             get: { settingsStore.settings.pollIntervalSeconds },
             set: { settingsStore.setPollInterval(seconds: $0) }
+        )
+    }
+
+    private var showProgressBarBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.showProgressBar },
+            set: { settingsStore.setShowProgressBar($0) }
         )
     }
 

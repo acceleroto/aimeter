@@ -63,7 +63,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(secondStore.settings.menuBar.showProgressBar)
     }
 
-    func testStoredDisabledProgressBarIsForcedOnDuringMerge() throws {
+    func testStoredDisabledProgressBarRemainsWhenPercentagesEnabled() throws {
         let suiteName = #function
         let userDefaults = UserDefaults(suiteName: suiteName)!
         userDefaults.removePersistentDomain(forName: suiteName)
@@ -80,8 +80,58 @@ final class SettingsStoreTests: XCTestCase {
 
         let store = SettingsStore(userDefaults: userDefaults)
 
-        XCTAssertTrue(store.settings.menuBar.showProgressBar)
+        XCTAssertFalse(store.settings.menuBar.showProgressBar)
         XCTAssertTrue(store.settings.menuBar.showCursorAutoAPIPercentages)
+    }
+
+    func testStoredMenuBarWithNoDisplayOptionsNormalizesToProgressBar() throws {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let settings = AppSettings(
+            pollIntervalSeconds: 300,
+            hasCompletedInitialSetup: false,
+            cursor: .default,
+            claude: .default,
+            menuBar: MenuBarAppearanceSettings(showProgressBar: false, showCursorAutoAPIPercentages: false)
+        )
+        let encoded = try JSONEncoder().encode(settings)
+        userDefaults.set(encoded, forKey: "aimeter.settings")
+
+        let store = SettingsStore(userDefaults: userDefaults)
+
+        XCTAssertTrue(store.settings.menuBar.showProgressBar)
+        XCTAssertFalse(store.settings.menuBar.showCursorAutoAPIPercentages)
+    }
+
+    func testDisablingProgressBarEnablesPercentagesWhenNeeded() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(userDefaults: userDefaults)
+        XCTAssertFalse(store.settings.menuBar.showCursorAutoAPIPercentages)
+
+        store.setShowProgressBar(false)
+
+        XCTAssertFalse(store.settings.menuBar.showProgressBar)
+        XCTAssertTrue(store.settings.menuBar.showCursorAutoAPIPercentages)
+    }
+
+    func testDisablingPercentagesEnablesProgressBarWhenNeeded() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(userDefaults: userDefaults)
+        store.setShowProgressBar(false)
+        store.setShowCursorAutoAPIPercentages(true)
+
+        store.setShowCursorAutoAPIPercentages(false)
+
+        XCTAssertTrue(store.settings.menuBar.showProgressBar)
+        XCTAssertFalse(store.settings.menuBar.showCursorAutoAPIPercentages)
     }
 
     func testExistingSettingsWithoutMenuBarDefaultMenuBarAppearance() throws {

@@ -107,7 +107,12 @@ final class MenuBarController {
 
         popover.contentSize = preferredPopoverSize(for: state)
 
-        if settings.menuBar.showProgressBar {
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: settings.menuBar,
+            cursorSnapshot: state.cursorSnapshot
+        )
+
+        if display.showProgressBarImage {
             button.image = StatusBarImageFactory.image(
                 progress: state.menuBarProgressPercent / 100,
                 state: primaryConnectionState(for: state)
@@ -116,37 +121,19 @@ final class MenuBarController {
             button.image = nil
         }
 
-        if let suffix = menuBarSuffix(for: state, settings: settings) {
-            button.imagePosition = .imageLeading
-            button.attributedTitle = NSAttributedString(string: "")
-            // Use plain title so the status bar draws adaptive light/dark text.
-            // Do not assign button.title = "" after setting text — that clears the label.
-            button.title = " \(suffix)"
+        button.attributedTitle = NSAttributedString(string: "")
+
+        if display.hasTitle {
+            button.imagePosition = display.showProgressBarImage ? .imageLeading : .noImage
+            button.title = display.statusItemTitle(includeImage: display.showProgressBarImage)
         } else {
             button.imagePosition = .imageOnly
-            button.attributedTitle = NSAttributedString(string: "")
             button.title = ""
         }
 
         button.needsDisplay = true
         statusItem.length = NSStatusItem.variableLength
         button.toolTip = tooltip(for: state, settings: settings)
-    }
-
-    private func menuBarSuffix(for state: DashboardState, settings: AppSettings) -> String? {
-        guard settings.menuBar.showCursorAutoAPIPercentages else {
-            return nil
-        }
-
-        let cursor = state.cursorSnapshot
-        guard cursor.connectionState != .disconnected, cursor.hasSuccessfulSync else {
-            return nil
-        }
-
-        return DisplayFormatting.cursorAutoAPISuffix(
-            auto: cursor.autoUsedPercent,
-            api: cursor.apiUsedPercent
-        )
     }
 
     private func preferredPopoverSize(for state: DashboardState) -> NSSize {
