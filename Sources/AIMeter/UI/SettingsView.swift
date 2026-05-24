@@ -25,25 +25,11 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Menu Bar") {
-                Toggle("Usage progress bar", isOn: showProgressBarBinding)
-                    .disabled(true)
-
-                Text("Always shown for now.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Toggle("Cursor Auto & API percentages", isOn: showCursorAutoAPIPercentagesBinding)
-
-                Text("Shows Auto and API usage to the right of the menu bar icon (e.g. 5.6%/7.8%).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             providerSettingsSection(
                 snapshot: state.cursorSnapshot,
                 coordinator: cursorUsageCoordinator,
-                localSessionDescription: "AIMeter uses a local Cursor web session stored in this app. No API key is required."
+                localSessionDescription: "AIMeter uses a local Cursor web session stored in this app. No API key is required.",
+                showMenuBarAutoAPIToggle: true
             )
 
             providerSettingsSection(
@@ -65,7 +51,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 520, minHeight: 560)
+        .frame(minWidth: 520, minHeight: 520)
         .padding(12)
         .onAppear {
             launchAtLoginController.refresh()
@@ -86,13 +72,6 @@ struct SettingsView: View {
         )
     }
 
-    private var showProgressBarBinding: Binding<Bool> {
-        Binding(
-            get: { settingsStore.settings.menuBar.showProgressBar },
-            set: { settingsStore.settings.menuBar.showProgressBar = $0 }
-        )
-    }
-
     private var showCursorAutoAPIPercentagesBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.menuBar.showCursorAutoAPIPercentages },
@@ -103,7 +82,8 @@ struct SettingsView: View {
     private func providerSettingsSection(
         snapshot: ProviderUsageSnapshot,
         coordinator: ProviderUsageCoordinator,
-        localSessionDescription: String
+        localSessionDescription: String,
+        showMenuBarAutoAPIToggle: Bool = false
     ) -> some View {
         Section(snapshot.provider.displayName) {
             connectionStatusRow(
@@ -130,6 +110,13 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(snapshot.connectionState == .disconnected)
+            }
+
+            if showMenuBarAutoAPIToggle {
+                Toggle(
+                    "Show Cursor Auto & API percentages in Menu Bar",
+                    isOn: showCursorAutoAPIPercentagesBinding
+                )
             }
 
             Text(localSessionDescription)

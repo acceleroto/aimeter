@@ -23,7 +23,7 @@ final class SettingsWindowController: NSWindowController {
         let window = NSWindow(contentViewController: hostingController)
         window.title = "AIMeter Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 520, height: 360))
+        window.setContentSize(NSSize(width: 520, height: 320))
         window.isReleasedWhenClosed = false
         window.center()
 
