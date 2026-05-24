@@ -12,3 +12,6 @@ xcuserdata/
 *.moved-aside
 *.dSYM/
 *.dSYM.zip
+
+# Local PR draft (not for the fork)
+pr-upstream-description.md
