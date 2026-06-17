@@ -19,13 +19,19 @@ struct MenuBarDisplay: Equatable {
 
 enum MenuBarDisplayResolver {
     static let placeholderSuffix = "--/--"
+    static let segmentSeparator = " | "
 
     static func resolve(
         menuBar: MenuBarAppearanceSettings,
-        cursorSnapshot: ProviderUsageSnapshot
+        cursorSnapshot: ProviderUsageSnapshot,
+        openAISnapshot: ProviderUsageSnapshot
     ) -> MenuBarDisplay {
         let settings = menuBar.normalized()
-        let titleText = resolvedTitleText(settings: settings, cursorSnapshot: cursorSnapshot)
+        let titleText = resolvedTitleText(
+            settings: settings,
+            cursorSnapshot: cursorSnapshot,
+            openAISnapshot: openAISnapshot
+        )
 
         return MenuBarDisplay(
             showProgressBarImage: settings.showProgressBar,
@@ -35,21 +41,42 @@ enum MenuBarDisplayResolver {
 
     private static func resolvedTitleText(
         settings: MenuBarAppearanceSettings,
-        cursorSnapshot: ProviderUsageSnapshot
+        cursorSnapshot: ProviderUsageSnapshot,
+        openAISnapshot: ProviderUsageSnapshot
     ) -> String {
-        guard settings.showCursorAutoAPIPercentages else {
-            return ""
+        var segments: [String] = []
+
+        if settings.showCursorAutoAPIPercentages {
+            segments.append(cursorSegment(from: cursorSnapshot, showPlaceholderWhenEmpty: !settings.showProgressBar))
         }
 
-        if let suffix = cursorAutoAPISuffix(from: cursorSnapshot) {
+        if settings.showOpenAICodexPercentages {
+            segments.append(openAISegment(from: openAISnapshot, showPlaceholderWhenEmpty: !settings.showProgressBar))
+        }
+
+        return segments.joined(separator: segmentSeparator)
+    }
+
+    private static func cursorSegment(
+        from snapshot: ProviderUsageSnapshot,
+        showPlaceholderWhenEmpty: Bool
+    ) -> String {
+        if let suffix = cursorAutoAPISuffix(from: snapshot) {
             return suffix
         }
 
-        if !settings.showProgressBar {
-            return placeholderSuffix
+        return showPlaceholderWhenEmpty ? placeholderSuffix : ""
+    }
+
+    private static func openAISegment(
+        from snapshot: ProviderUsageSnapshot,
+        showPlaceholderWhenEmpty: Bool
+    ) -> String {
+        if let suffix = openAICodexSuffix(from: snapshot) {
+            return suffix
         }
 
-        return ""
+        return showPlaceholderWhenEmpty ? placeholderSuffix : ""
     }
 
     private static func cursorAutoAPISuffix(from snapshot: ProviderUsageSnapshot) -> String? {
@@ -57,9 +84,25 @@ enum MenuBarDisplayResolver {
             return nil
         }
 
-        return DisplayFormatting.cursorAutoAPISuffix(
+        return DisplayFormatting.menuBarCursorAutoAPISuffix(
             auto: snapshot.autoUsedPercent,
             api: snapshot.apiUsedPercent
+        )
+    }
+
+    private static func openAICodexSuffix(from snapshot: ProviderUsageSnapshot) -> String? {
+        guard
+            snapshot.provider == .openai,
+            snapshot.connectionState != .disconnected,
+            snapshot.hasSuccessfulSync,
+            let fiveHour = snapshot.progressPercent
+        else {
+            return nil
+        }
+
+        return DisplayFormatting.menuBarOpenAICodexSuffix(
+            fiveHour: fiveHour,
+            weekly: snapshot.weeklyUsedPercent
         )
     }
 }

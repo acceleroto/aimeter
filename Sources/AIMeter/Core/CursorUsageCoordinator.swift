@@ -123,3 +123,4 @@ final class ProviderUsageCoordinator: ObservableObject {
 
 typealias CursorUsageCoordinator = ProviderUsageCoordinator
 typealias ClaudeUsageCoordinator = ProviderUsageCoordinator
+typealias OpenAIUsageCoordinator = ProviderUsageCoordinator

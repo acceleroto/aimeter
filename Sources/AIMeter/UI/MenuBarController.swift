@@ -3,11 +3,12 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject {
     private let settingsStore: SettingsStore
     private let dashboardStore: DashboardStore
     private let cursorUsageCoordinator: CursorUsageCoordinator
     private let claudeUsageCoordinator: ClaudeUsageCoordinator
+    private let openAIUsageCoordinator: OpenAIUsageCoordinator
     private let settingsWindowController: SettingsWindowController
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -16,18 +17,45 @@ final class MenuBarController {
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
 
+    private lazy var contextMenu: NSMenu = {
+        let menu = NSMenu()
+
+        let refreshItem = NSMenuItem(
+            title: "Refresh",
+            action: #selector(refreshAllProviders),
+            keyEquivalent: "r"
+        )
+        refreshItem.target = self
+        menu.addItem(refreshItem)
+
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(
+            title: "Quit",
+            action: #selector(quitApplication),
+            keyEquivalent: "q"
+        )
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        return menu
+    }()
+
     init(
         settingsStore: SettingsStore,
         dashboardStore: DashboardStore,
         cursorUsageCoordinator: CursorUsageCoordinator,
         claudeUsageCoordinator: ClaudeUsageCoordinator,
+        openAIUsageCoordinator: OpenAIUsageCoordinator,
         settingsWindowController: SettingsWindowController
     ) {
         self.settingsStore = settingsStore
         self.dashboardStore = dashboardStore
         self.cursorUsageCoordinator = cursorUsageCoordinator
         self.claudeUsageCoordinator = claudeUsageCoordinator
+        self.openAIUsageCoordinator = openAIUsageCoordinator
         self.settingsWindowController = settingsWindowController
+        super.init()
     }
 
     func install() {
@@ -43,7 +71,8 @@ final class MenuBarController {
 
         guard let button = statusItem.button else { return }
         button.target = self
-        button.action = #selector(togglePopover)
+        button.action = #selector(statusItemClicked)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.imagePosition = .imageOnly
     }
 
@@ -56,11 +85,15 @@ final class MenuBarController {
                 dashboardStore: dashboardStore,
                 cursorUsageCoordinator: cursorUsageCoordinator,
                 claudeUsageCoordinator: claudeUsageCoordinator,
+                openAIUsageCoordinator: openAIUsageCoordinator,
                 onRefreshCursor: { [weak cursorUsageCoordinator] in
                     Task { await cursorUsageCoordinator?.refresh() }
                 },
                 onRefreshClaude: { [weak claudeUsageCoordinator] in
                     Task { await claudeUsageCoordinator?.refresh() }
+                },
+                onRefreshOpenAI: { [weak openAIUsageCoordinator] in
+                    Task { await openAIUsageCoordinator?.refresh() }
                 },
                 onConnectCursor: { [weak cursorUsageCoordinator] in
                     Task { await cursorUsageCoordinator?.connect() }
@@ -68,11 +101,17 @@ final class MenuBarController {
                 onConnectClaude: { [weak claudeUsageCoordinator] in
                     Task { await claudeUsageCoordinator?.connect() }
                 },
+                onConnectOpenAI: { [weak openAIUsageCoordinator] in
+                    Task { await openAIUsageCoordinator?.connect() }
+                },
                 onDisconnectCursor: { [weak cursorUsageCoordinator] in
                     cursorUsageCoordinator?.disconnect()
                 },
                 onDisconnectClaude: { [weak claudeUsageCoordinator] in
                     claudeUsageCoordinator?.disconnect()
+                },
+                onDisconnectOpenAI: { [weak openAIUsageCoordinator] in
+                    openAIUsageCoordinator?.disconnect()
                 },
                 onOpenSettings: { [weak self] in
                     self?.openSettings()
@@ -109,7 +148,8 @@ final class MenuBarController {
 
         let display = MenuBarDisplayResolver.resolve(
             menuBar: settings.menuBar,
-            cursorSnapshot: state.cursorSnapshot
+            cursorSnapshot: state.cursorSnapshot,
+            openAISnapshot: state.openaiSnapshot
         )
 
         if display.showProgressBarImage {
@@ -142,7 +182,14 @@ final class MenuBarController {
         if state.presentationState == .firstRun || connectedProviderCount == 0 {
             height = 420
         } else {
-            height = connectedProviderCount == 1 ? 370 : 560
+            switch connectedProviderCount {
+            case 1:
+                height = 370
+            case 2:
+                height = 560
+            default:
+                height = 680
+            }
         }
 
         return NSSize(width: 380, height: height)
@@ -151,7 +198,7 @@ final class MenuBarController {
     private func tooltip(for state: DashboardState, settings: AppSettings) -> String {
         let connectedSnapshots = state.connectedProviderSnapshots
         guard !connectedSnapshots.isEmpty else {
-            return "AIMeter: Connect Cursor or Claude"
+            return "AIMeter: Connect Cursor, Claude, or OpenAI"
         }
 
         var lines = connectedSnapshots
@@ -168,6 +215,15 @@ final class MenuBarController {
             if cursor.connectionState != .disconnected, cursor.hasSuccessfulSync {
                 lines.append(
                     "Cursor Auto: \(DisplayFormatting.percent(cursor.autoUsedPercent)), API: \(DisplayFormatting.percent(cursor.apiUsedPercent))"
+                )
+            }
+        }
+
+        if settings.menuBar.showOpenAICodexPercentages {
+            let openAI = state.openaiSnapshot
+            if openAI.connectionState != .disconnected, openAI.hasSuccessfulSync, let fiveHour = openAI.progressPercent {
+                lines.append(
+                    "OpenAI 5-hour: \(DisplayFormatting.percent(fiveHour)), Weekly: \(DisplayFormatting.percent(openAI.weeklyUsedPercent))"
                 )
             }
         }
@@ -200,6 +256,48 @@ final class MenuBarController {
     }
 
     @objc
+    private func statusItemClicked(_ sender: AnyObject?) {
+        if shouldShowContextMenu(for: NSApp.currentEvent) {
+            showContextMenu()
+            return
+        }
+
+        togglePopover(sender)
+    }
+
+    @objc
+    private func refreshAllProviders() {
+        Task {
+            await cursorUsageCoordinator.refresh()
+            await claudeUsageCoordinator.refresh()
+            await openAIUsageCoordinator.refresh()
+        }
+    }
+
+    @objc
+    private func quitApplication() {
+        NSApp.terminate(nil)
+    }
+
+    private func shouldShowContextMenu(for event: NSEvent?) -> Bool {
+        guard let event else {
+            return false
+        }
+
+        if event.type == .rightMouseUp {
+            return true
+        }
+
+        return event.type == .leftMouseUp && event.modifierFlags.contains(.control)
+    }
+
+    private func showContextMenu() {
+        guard let button = statusItem.button else { return }
+
+        let location = NSPoint(x: button.bounds.midX, y: button.bounds.maxY + 2)
+        contextMenu.popUp(positioning: nil, at: location, in: button)
+    }
+
     private func togglePopover(_ sender: AnyObject?) {
         guard let button = statusItem.button else { return }
 

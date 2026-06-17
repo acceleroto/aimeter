@@ -29,7 +29,8 @@ final class SettingsStore: ObservableObject {
                 pollIntervalSeconds: 300,
                 hasCompletedInitialSetup: false,
                 cursor: decoded.mergedWithDefaults,
-                claude: .default
+                claude: .default,
+                openAI: .default
             )
         } else {
             settings = .default
@@ -56,11 +57,15 @@ final class SettingsStore: ObservableObject {
         settings.claude.usagePageURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    func setOpenAIUsagePageURL(_ url: String) {
+        settings.openAI.usagePageURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func setShowProgressBar(_ enabled: Bool) {
         var updated = settings
         var menuBar = updated.menuBar.normalized()
 
-        if !enabled, !menuBar.showCursorAutoAPIPercentages {
+        if !enabled, !menuBar.showCursorAutoAPIPercentages, !menuBar.showOpenAICodexPercentages {
             menuBar.showCursorAutoAPIPercentages = true
         }
 
@@ -73,11 +78,24 @@ final class SettingsStore: ObservableObject {
         var updated = settings
         var menuBar = updated.menuBar.normalized()
 
-        if !enabled, !menuBar.showProgressBar {
+        if !enabled, !menuBar.showProgressBar, !menuBar.showOpenAICodexPercentages {
             menuBar.showProgressBar = true
         }
 
         menuBar.showCursorAutoAPIPercentages = enabled
+        updated.menuBar = menuBar.normalized()
+        settings = updated
+    }
+
+    func setShowOpenAICodexPercentages(_ enabled: Bool) {
+        var updated = settings
+        var menuBar = updated.menuBar.normalized()
+
+        if !enabled, !menuBar.showProgressBar, !menuBar.showCursorAutoAPIPercentages {
+            menuBar.showProgressBar = true
+        }
+
+        menuBar.showOpenAICodexPercentages = enabled
         updated.menuBar = menuBar.normalized()
         settings = updated
     }
@@ -98,6 +116,7 @@ private extension AppSettings {
             hasCompletedInitialSetup: hasCompletedInitialSetup,
             cursor: cursor.mergedWithDefaults,
             claude: claude.mergedWithDefaults,
+            openAI: openAI.mergedWithDefaults,
             menuBar: menuBar.mergedWithDefaults
         )
     }
@@ -121,6 +140,14 @@ private extension ClaudeSettings {
     var mergedWithDefaults: ClaudeSettings {
         ClaudeSettings(
             usagePageURL: ClaudeURLValidator.sanitizedUsageURL(usagePageURL)
+        )
+    }
+}
+
+private extension OpenAISettings {
+    var mergedWithDefaults: OpenAISettings {
+        OpenAISettings(
+            usagePageURL: OpenAIURLValidator.sanitizedUsageURL(usagePageURL)
         )
     }
 }

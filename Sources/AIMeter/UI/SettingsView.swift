@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject var dashboardStore: DashboardStore
     @ObservedObject var cursorUsageCoordinator: CursorUsageCoordinator
     @ObservedObject var claudeUsageCoordinator: ClaudeUsageCoordinator
+    @ObservedObject var openAIUsageCoordinator: OpenAIUsageCoordinator
     @ObservedObject var launchAtLoginController: LaunchAtLoginController
 
     var body: some View {
@@ -20,7 +21,7 @@ struct SettingsView: View {
 
                 Toggle("Show usage progress bar", isOn: showProgressBarBinding)
 
-                Text("Turn off only if Cursor Auto & API percentages are shown in the menu bar.")
+                Text("Turn off only if provider usage percentages are shown in the menu bar.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -35,13 +36,22 @@ struct SettingsView: View {
                 snapshot: state.cursorSnapshot,
                 coordinator: cursorUsageCoordinator,
                 localSessionDescription: "AIMeter uses a local Cursor web session stored in this app. No API key is required.",
-                showMenuBarAutoAPIToggle: true
+                showMenuBarPercentagesToggle: true,
+                menuBarPercentagesToggleTitle: "Show Cursor Auto & API percentages in Menu Bar"
             )
 
             providerSettingsSection(
                 snapshot: state.claudeSnapshot,
                 coordinator: claudeUsageCoordinator,
                 localSessionDescription: "AIMeter uses a local Claude web session stored in this app. No API key is required."
+            )
+
+            providerSettingsSection(
+                snapshot: state.openaiSnapshot,
+                coordinator: openAIUsageCoordinator,
+                localSessionDescription: "AIMeter reads ChatGPT Codex analytics from a local web session. No API key is required.",
+                showMenuBarPercentagesToggle: true,
+                menuBarPercentagesToggleTitle: "Show OpenAI 5-hour & Weekly percentages in Menu Bar"
             )
 
             Section("Polling") {
@@ -92,11 +102,19 @@ struct SettingsView: View {
         )
     }
 
+    private var showOpenAICodexPercentagesBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.showOpenAICodexPercentages },
+            set: { settingsStore.setShowOpenAICodexPercentages($0) }
+        )
+    }
+
     private func providerSettingsSection(
         snapshot: ProviderUsageSnapshot,
         coordinator: ProviderUsageCoordinator,
         localSessionDescription: String,
-        showMenuBarAutoAPIToggle: Bool = false
+        showMenuBarPercentagesToggle: Bool = false,
+        menuBarPercentagesToggleTitle: String = ""
     ) -> some View {
         Section(snapshot.provider.displayName) {
             connectionStatusRow(
@@ -125,16 +143,27 @@ struct SettingsView: View {
                 .disabled(snapshot.connectionState == .disconnected)
             }
 
-            if showMenuBarAutoAPIToggle {
+            if showMenuBarPercentagesToggle {
                 Toggle(
-                    "Show Cursor Auto & API percentages in Menu Bar",
-                    isOn: showCursorAutoAPIPercentagesBinding
+                    menuBarPercentagesToggleTitle,
+                    isOn: menuBarPercentagesToggleBinding(for: snapshot.provider)
                 )
             }
 
             Text(localSessionDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func menuBarPercentagesToggleBinding(for provider: UsageProvider) -> Binding<Bool> {
+        switch provider {
+        case .cursor:
+            return showCursorAutoAPIPercentagesBinding
+        case .openai:
+            return showOpenAICodexPercentagesBinding
+        case .claude:
+            return .constant(false)
         }
     }
 

@@ -7,10 +7,13 @@ final class AppEnvironment {
     let settingsStore: SettingsStore
     let cursorSessionManager: CursorSessionManager
     let claudeSessionManager: ClaudeSessionManager
+    let openAISessionManager: OpenAISessionManager
     let cursorUsageClient: CursorUsageClient
     let claudeUsageClient: ProviderUsageClient
+    let openAIUsageClient: ProviderUsageClient
     let cursorUsageCoordinator: CursorUsageCoordinator
     let claudeUsageCoordinator: ClaudeUsageCoordinator
+    let openAIUsageCoordinator: OpenAIUsageCoordinator
     let dashboardStore: DashboardStore
     let launchAtLoginController: LaunchAtLoginController
 
@@ -20,6 +23,7 @@ final class AppEnvironment {
             dashboardStore: dashboardStore,
             cursorUsageCoordinator: cursorUsageCoordinator,
             claudeUsageCoordinator: claudeUsageCoordinator,
+            openAIUsageCoordinator: openAIUsageCoordinator,
             launchAtLoginController: launchAtLoginController
         )
     }()
@@ -29,6 +33,7 @@ final class AppEnvironment {
             dashboardStore: dashboardStore,
             cursorUsageCoordinator: cursorUsageCoordinator,
             claudeUsageCoordinator: claudeUsageCoordinator,
+            openAIUsageCoordinator: openAIUsageCoordinator,
             settingsWindowController: settingsWindowController
         )
     }()
@@ -37,6 +42,7 @@ final class AppEnvironment {
         let settingsStore = SettingsStore()
         let cursorSessionManager = CursorSessionManager()
         let claudeSessionManager = ClaudeSessionManager()
+        let openAISessionManager = OpenAISessionManager()
         let cursorUsageClient = CursorDashboardClient(
             settingsStore: settingsStore,
             sessionManager: cursorSessionManager
@@ -44,6 +50,10 @@ final class AppEnvironment {
         let claudeUsageClient = ClaudeDashboardClient(
             settingsStore: settingsStore,
             sessionManager: claudeSessionManager
+        )
+        let openAIUsageClient = OpenAIDashboardClient(
+            settingsStore: settingsStore,
+            sessionManager: openAISessionManager
         )
         let cursorUsageCoordinator = CursorUsageCoordinator(
             settingsStore: settingsStore,
@@ -53,20 +63,28 @@ final class AppEnvironment {
             settingsStore: settingsStore,
             client: claudeUsageClient
         )
+        let openAIUsageCoordinator = OpenAIUsageCoordinator(
+            settingsStore: settingsStore,
+            client: openAIUsageClient
+        )
         let dashboardStore = DashboardStore(
             settingsStore: settingsStore,
             cursorUsageCoordinator: cursorUsageCoordinator,
-            claudeUsageCoordinator: claudeUsageCoordinator
+            claudeUsageCoordinator: claudeUsageCoordinator,
+            openAIUsageCoordinator: openAIUsageCoordinator
         )
         let launchAtLoginController = LaunchAtLoginController()
 
         self.settingsStore = settingsStore
         self.cursorSessionManager = cursorSessionManager
         self.claudeSessionManager = claudeSessionManager
+        self.openAISessionManager = openAISessionManager
         self.cursorUsageClient = cursorUsageClient
         self.claudeUsageClient = claudeUsageClient
+        self.openAIUsageClient = openAIUsageClient
         self.cursorUsageCoordinator = cursorUsageCoordinator
         self.claudeUsageCoordinator = claudeUsageCoordinator
+        self.openAIUsageCoordinator = openAIUsageCoordinator
         self.dashboardStore = dashboardStore
         self.launchAtLoginController = launchAtLoginController
     }

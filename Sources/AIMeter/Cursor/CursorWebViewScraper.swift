@@ -8,6 +8,11 @@ final class CursorWebViewScraper: NSObject {
         case background
     }
 
+    private enum LoadPhase {
+        case usage
+        case billing
+    }
+
     let webView: WKWebView
 
     private let mode: Mode
@@ -19,11 +24,16 @@ final class CursorWebViewScraper: NSObject {
     private var timeoutTask: Task<Void, Never>?
     private var pollTimer: Timer?
     private var hasResolved = false
+    private var loadPhase: LoadPhase = .usage
+    private var pendingUsageSnapshot: CursorUsageSnapshot?
+    private var billingPhaseStartedAt: Date?
+
+    private static let billingPageURL = URL(string: CursorDashboardParser.billingPageURL)!
 
     init(mode: Mode, usagePageURL: URL, dataStore: WKWebsiteDataStore) {
         self.mode = mode
         self.usagePageURL = usagePageURL
-        self.timeoutSeconds = mode == .interactive ? 180 : 25
+        self.timeoutSeconds = mode == .interactive ? 180 : 35
 
         let contentController = WKUserContentController()
         self.contentController = contentController
@@ -56,6 +66,9 @@ final class CursorWebViewScraper: NSObject {
 
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
+            loadPhase = .usage
+            pendingUsageSnapshot = nil
+            billingPhaseStartedAt = nil
             let request = URLRequest(url: usagePageURL)
             webView.load(request)
             scheduleTimeout()
@@ -72,6 +85,11 @@ final class CursorWebViewScraper: NSObject {
             guard let self else { return }
             try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
             await MainActor.run {
+                if let pendingUsageSnapshot = self.pendingUsageSnapshot, self.loadPhase == .billing {
+                    self.resolve(.success(pendingUsageSnapshot))
+                    return
+                }
+
                 let message: String
                 switch self.mode {
                 case .interactive:
@@ -106,6 +124,11 @@ final class CursorWebViewScraper: NSObject {
             return
         }
 
+        if loadPhase == .billing, shouldGiveUpOnBillingPhase() {
+            finishWithPendingUsage(resetDisplay: nil)
+            return
+        }
+
         let script = """
         ({
           text: document.body ? document.body.innerText : "",
@@ -121,16 +144,23 @@ final class CursorWebViewScraper: NSObject {
             let text = result["text"] as? String ?? ""
             let url = result["url"] as? String ?? webView.url?.absoluteString ?? usagePageURL.absoluteString
 
-            switch CursorDashboardParser.parseDOMText(text, sourceURL: url) {
-            case .usage(let snapshot):
-                resolve(.success(snapshot))
-            case .authRequired where mode == .background:
-                resolve(.failure(CursorUsageError.authExpired))
-            case .authRequired, .noMatch:
-                break
+            switch loadPhase {
+            case .usage:
+                switch CursorDashboardParser.parseDOMText(text, sourceURL: url) {
+                case .usage(let snapshot):
+                    beginBillingPhase(with: snapshot)
+                case .authRequired where mode == .background:
+                    resolve(.failure(CursorUsageError.authExpired))
+                case .authRequired, .noMatch:
+                    break
+                }
+            case .billing:
+                if let resetDisplay = CursorDashboardParser.parseBillingReset(from: text, sourceURL: url) {
+                    finishWithPendingUsage(resetDisplay: resetDisplay)
+                }
             }
         } catch {
-            if mode == .background {
+            if mode == .background, loadPhase == .usage {
                 resolve(.failure(CursorUsageError.syncFailed("Failed reading the Cursor dashboard.")))
             }
         }
@@ -147,14 +177,48 @@ final class CursorWebViewScraper: NSObject {
             return
         }
 
-        switch CursorDashboardParser.parseResponseBody(body, sourceURL: sourceURL) {
-        case .usage(let snapshot):
-            resolve(.success(snapshot))
-        case .authRequired where mode == .background:
-            resolve(.failure(CursorUsageError.authExpired))
-        case .authRequired, .noMatch:
-            break
+        switch loadPhase {
+        case .usage:
+            switch CursorDashboardParser.parseResponseBody(body, sourceURL: sourceURL) {
+            case .usage(let snapshot):
+                beginBillingPhase(with: snapshot)
+            case .authRequired where mode == .background:
+                resolve(.failure(CursorUsageError.authExpired))
+            case .authRequired, .noMatch:
+                break
+            }
+        case .billing:
+            if let resetDisplay = CursorDashboardParser.parseBillingReset(fromResponseBody: body, sourceURL: sourceURL) {
+                finishWithPendingUsage(resetDisplay: resetDisplay)
+            }
         }
+    }
+
+    private func beginBillingPhase(with snapshot: CursorUsageSnapshot) {
+        guard loadPhase == .usage else {
+            return
+        }
+
+        pendingUsageSnapshot = snapshot.replacingResetDisplay(nil)
+        loadPhase = .billing
+        billingPhaseStartedAt = Date()
+        webView.load(URLRequest(url: Self.billingPageURL))
+    }
+
+    private func finishWithPendingUsage(resetDisplay: String?) {
+        guard let pendingUsageSnapshot else {
+            return
+        }
+
+        resolve(.success(pendingUsageSnapshot.replacingResetDisplay(resetDisplay)))
+    }
+
+    private func shouldGiveUpOnBillingPhase() -> Bool {
+        guard let billingPhaseStartedAt else {
+            return false
+        }
+
+        return Date().timeIntervalSince(billingPhaseStartedAt) > 12
     }
 
     private func resolve(_ result: Result<CursorUsageSnapshot, Error>) {
@@ -178,6 +242,7 @@ final class CursorWebViewScraper: NSObject {
         }
 
         continuation = nil
+        pendingUsageSnapshot = nil
     }
 
     private static let messageHandlerName = "cursorNetworkBridge"
@@ -289,6 +354,11 @@ extension CursorWebViewScraper: WKNavigationDelegate {
             return
         }
 
+        if loadPhase == .billing, pendingUsageSnapshot != nil {
+            finishWithPendingUsage(resetDisplay: nil)
+            return
+        }
+
         resolve(.failure(CursorUsageError.syncFailed(error.localizedDescription)))
     }
 
@@ -298,6 +368,11 @@ extension CursorWebViewScraper: WKNavigationDelegate {
         }
 
         guard mode == .background else {
+            return
+        }
+
+        if loadPhase == .billing, pendingUsageSnapshot != nil {
+            finishWithPendingUsage(resetDisplay: nil)
             return
         }
 

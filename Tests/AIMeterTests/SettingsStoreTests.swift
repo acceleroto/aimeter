@@ -134,6 +134,20 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.settings.menuBar.showCursorAutoAPIPercentages)
     }
 
+    func testOpenAICodexPercentagesPersistAcrossReloads() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let firstStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertFalse(firstStore.settings.menuBar.showOpenAICodexPercentages)
+
+        firstStore.setShowOpenAICodexPercentages(true)
+
+        let secondStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertTrue(secondStore.settings.menuBar.showOpenAICodexPercentages)
+    }
+
     func testExistingSettingsWithoutMenuBarDefaultMenuBarAppearance() throws {
         let suiteName = #function
         let userDefaults = UserDefaults(suiteName: suiteName)!

@@ -7,11 +7,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.menuBarController.install()
         environment.cursorUsageCoordinator.start()
         environment.claudeUsageCoordinator.start()
+        environment.openAIUsageCoordinator.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         let environment = AppEnvironment.shared
         environment.cursorUsageCoordinator.stop()
         environment.claudeUsageCoordinator.stop()
+        environment.openAIUsageCoordinator.stop()
     }
 }

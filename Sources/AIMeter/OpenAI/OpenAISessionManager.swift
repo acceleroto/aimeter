@@ -1,0 +1,105 @@
+import Foundation
+import WebKit
+
+@MainActor
+protocol OpenAISessionManaging {
+    func connect(to usagePageURL: URL) async throws -> ProviderUsageSnapshot
+    func fetchUsage(from usagePageURL: URL) async throws -> ProviderUsageSnapshot
+    func disconnect()
+}
+
+@MainActor
+final class OpenAISessionManager: OpenAISessionManaging {
+    private static let dataStoreIdentifier = UUID(uuidString: "C8A4F912-6D2B-4F1E-9A03-7E5B2C1D4F60")!
+
+    private let dataStore: WKWebsiteDataStore
+    private var connectionWindowController: UsageConnectionWindowController?
+    private var activeScraper: OpenAIWebViewScraper?
+    private var websiteDataCleanupTask: Task<Void, Never>?
+
+    private(set) var isConnected = false
+
+    init() {
+        self.dataStore = WKWebsiteDataStore(forIdentifier: Self.dataStoreIdentifier)
+    }
+
+    init(dataStore: WKWebsiteDataStore) {
+        self.dataStore = dataStore
+    }
+
+    func connect(to usagePageURL: URL) async throws -> ProviderUsageSnapshot {
+        await waitForWebsiteDataCleanup()
+
+        let scraper = OpenAIWebViewScraper(mode: .interactive, usagePageURL: usagePageURL, dataStore: dataStore)
+        let windowController = UsageConnectionWindowController(title: "Connect OpenAI", webView: scraper.webView)
+
+        activeScraper = scraper
+        connectionWindowController = windowController
+        windowController.onClose = { [weak scraper] in
+            scraper?.cancel()
+        }
+        windowController.show()
+
+        defer {
+            windowController.close()
+            activeScraper = nil
+            connectionWindowController = nil
+        }
+
+        let snapshot = try await scraper.start()
+        isConnected = true
+        return snapshot
+    }
+
+    func fetchUsage(from usagePageURL: URL) async throws -> ProviderUsageSnapshot {
+        await waitForWebsiteDataCleanup()
+
+        let scraper = OpenAIWebViewScraper(mode: .background, usagePageURL: usagePageURL, dataStore: dataStore)
+        activeScraper = scraper
+        defer { activeScraper = nil }
+        let snapshot = try await scraper.start()
+        isConnected = true
+        return snapshot
+    }
+
+    func disconnect() {
+        isConnected = false
+        activeScraper?.cancel()
+        connectionWindowController?.close()
+        startWebsiteDataCleanup()
+    }
+
+    private func startWebsiteDataCleanup() {
+        guard websiteDataCleanupTask == nil else {
+            return
+        }
+
+        websiteDataCleanupTask = Task { [dataStore] in
+            await Self.clearWebsiteData(in: dataStore)
+        }
+    }
+
+    private func waitForWebsiteDataCleanup() async {
+        guard let websiteDataCleanupTask else {
+            return
+        }
+
+        await websiteDataCleanupTask.value
+        self.websiteDataCleanupTask = nil
+    }
+
+    private static func clearWebsiteData(in dataStore: WKWebsiteDataStore) async {
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        await withCheckedContinuation { continuation in
+            dataStore.fetchDataRecords(ofTypes: types) { records in
+                let openAIRecords = records.filter { record in
+                    record.displayName.localizedCaseInsensitiveContains("chatgpt")
+                        || record.displayName.localizedCaseInsensitiveContains("openai")
+                }
+                dataStore.removeData(ofTypes: types, for: openAIRecords) {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+}

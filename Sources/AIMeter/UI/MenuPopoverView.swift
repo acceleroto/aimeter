@@ -4,13 +4,17 @@ struct MenuPopoverView: View {
     @ObservedObject var dashboardStore: DashboardStore
     @ObservedObject var cursorUsageCoordinator: CursorUsageCoordinator
     @ObservedObject var claudeUsageCoordinator: ClaudeUsageCoordinator
+    @ObservedObject var openAIUsageCoordinator: OpenAIUsageCoordinator
 
     let onRefreshCursor: () -> Void
     let onRefreshClaude: () -> Void
+    let onRefreshOpenAI: () -> Void
     let onConnectCursor: () -> Void
     let onConnectClaude: () -> Void
+    let onConnectOpenAI: () -> Void
     let onDisconnectCursor: () -> Void
     let onDisconnectClaude: () -> Void
+    let onDisconnectOpenAI: () -> Void
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
 
@@ -62,7 +66,7 @@ struct MenuPopoverView: View {
             }
 
             if dashboardStore.state.presentationState == .firstRun {
-                Text("Track Cursor and Claude usage from signed-in local web sessions.")
+                Text("Track Cursor, Claude, and OpenAI usage from signed-in local web sessions.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -73,15 +77,21 @@ struct MenuPopoverView: View {
         cursorUsageCoordinator.isRefreshing ||
             cursorUsageCoordinator.isConnecting ||
             claudeUsageCoordinator.isRefreshing ||
-            claudeUsageCoordinator.isConnecting
+            claudeUsageCoordinator.isConnecting ||
+            openAIUsageCoordinator.isRefreshing ||
+            openAIUsageCoordinator.isConnecting
     }
 
     private var isAnyProviderRefreshing: Bool {
-        cursorUsageCoordinator.isRefreshing || claudeUsageCoordinator.isRefreshing
+        cursorUsageCoordinator.isRefreshing ||
+            claudeUsageCoordinator.isRefreshing ||
+            openAIUsageCoordinator.isRefreshing
     }
 
     private var hasLoadedProviderState: Bool {
-        cursorUsageCoordinator.hasLoadedOnce && claudeUsageCoordinator.hasLoadedOnce
+        cursorUsageCoordinator.hasLoadedOnce &&
+            claudeUsageCoordinator.hasLoadedOnce &&
+            openAIUsageCoordinator.hasLoadedOnce
     }
 
     private func shouldShowInitialLoading(connectedProviderCount: Int) -> Bool {
@@ -97,7 +107,14 @@ struct MenuPopoverView: View {
             return 420
         }
 
-        return connectedProviderCount == 1 ? 370 : 560
+        switch connectedProviderCount {
+        case 1:
+            return 370
+        case 2:
+            return 560
+        default:
+            return 680
+        }
     }
 
     private var firstRunContent: some View {
@@ -123,6 +140,13 @@ struct MenuPopoverView: View {
                 action: onConnectClaude
             )
 
+            onboardingTile(
+                provider: .openai,
+                description: "Track ChatGPT Plus Codex usage from the analytics page: 5-hour limit, weekly limit, and credits.",
+                buttonTitle: "Connect OpenAI",
+                action: onConnectOpenAI
+            )
+
             HStack {
                 Spacer()
                 Button("Quit", action: onQuit)
@@ -138,7 +162,7 @@ struct MenuPopoverView: View {
                 .controlSize(.regular)
             Text("Checking connected sessions...")
                 .font(.headline)
-            Text("AIMeter is loading saved Cursor and Claude sessions.")
+            Text("AIMeter is loading saved provider sessions.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -158,7 +182,7 @@ struct MenuPopoverView: View {
         )
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(snapshot.provider.displayName)
                         .font(.caption)
@@ -170,11 +194,19 @@ struct MenuPopoverView: View {
                         .foregroundStyle(providerStatusColor(for: snapshot.connectionState))
                 }
                 Spacer()
-                Text(snapshot.primaryMetric.value)
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(3)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(snapshot.primaryMetric.value)
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .multilineTextAlignment(.trailing)
+                        .lineLimit(3)
+                    if showsResetInHeader(for: snapshot.provider), let primaryResetText {
+                        Text(primaryResetText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
 
             if let progressPercent = snapshot.progressPercent {
@@ -182,7 +214,7 @@ struct MenuPopoverView: View {
                     .tint(providerProgressColor(for: progressPercent))
             }
 
-            if let primaryResetText {
+            if !showsResetInHeader(for: snapshot.provider), let primaryResetText {
                 Text(primaryResetText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -198,15 +230,12 @@ struct MenuPopoverView: View {
             }
 
             if !usageMetrics.isEmpty {
-                HStack(spacing: 10) {
-                    ForEach(usageMetrics, id: \.title) { metric in
-                        metricCard(
-                            title: metric.title,
-                            value: metric.value,
-                            subtitle: resetText(for: metric, statusMetrics: statusMetrics)
-                        )
+                UsageMetricCardsRow(
+                    metrics: usageMetrics,
+                    resetText: { metric in
+                        resetText(for: metric, statusMetrics: statusMetrics)
                     }
-                }
+                )
             }
 
             providerFooter(
@@ -237,24 +266,41 @@ struct MenuPopoverView: View {
 
     private func displayUsageMetrics(for snapshot: ProviderUsageSnapshot) -> [UsageMetric] {
         let metrics = snapshot.secondaryMetrics.filter { $0.percent != nil }
-        guard snapshot.provider == .claude else {
+        switch snapshot.provider {
+        case .claude:
+            return ["All models", "Claude Design"].compactMap { title in
+                metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
+            }
+        case .openai:
+            let fiveHourCard: UsageMetric? = {
+                if snapshot.primaryMetric.percent != nil,
+                   snapshot.primaryMetric.title.caseInsensitiveCompare("5-hour") == .orderedSame {
+                    return snapshot.primaryMetric
+                }
+                return metrics.first { $0.title.caseInsensitiveCompare("5-hour") == .orderedSame }
+            }()
+            let weekly = metrics.first { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }
+            return [fiveHourCard, weekly].compactMap { $0 }
+        case .cursor:
             return metrics.removingDuplicateTitles()
-        }
-
-        return ["All models", "Claude Design"].compactMap { title in
-            metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
         }
     }
 
     private func displayStatusMetrics(for snapshot: ProviderUsageSnapshot) -> [UsageMetric] {
         let metrics = snapshot.secondaryMetrics.filter { $0.percent == nil }
-        guard snapshot.provider == .claude else {
+        switch snapshot.provider {
+        case .claude:
+            let titles = ["Reset", "All models reset", "Claude Design reset"]
+            return titles.compactMap { title in
+                metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
+            }
+        case .openai:
+            let titles = ["5-hour reset", "Weekly reset"]
+            return titles.compactMap { title in
+                metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
+            }
+        case .cursor:
             return metrics.removingDuplicateTitles()
-        }
-
-        let titles = ["Reset", "All models reset", "Claude Design reset"]
-        return titles.compactMap { title in
-            metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
         }
     }
 
@@ -326,7 +372,7 @@ struct MenuPopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Circle()
-                    .fill(provider == .cursor ? Color.blue : Color.purple)
+                    .fill(providerAccentColor(for: provider))
                     .frame(width: 8, height: 8)
                 Text(provider.displayName)
                     .font(.headline)
@@ -344,31 +390,6 @@ struct MenuPopoverView: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))
-        )
-    }
-
-    private func metricCard(title: String, value: String, subtitle: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.title3.weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(2)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .underPageBackgroundColor))
         )
     }
 
@@ -437,6 +458,8 @@ struct MenuPopoverView: View {
             return cursorUsageCoordinator
         case .claude:
             return claudeUsageCoordinator
+        case .openai:
+            return openAIUsageCoordinator
         }
     }
 
@@ -446,7 +469,24 @@ struct MenuPopoverView: View {
             return (onRefreshCursor, onConnectCursor, onDisconnectCursor)
         case .claude:
             return (onRefreshClaude, onConnectClaude, onDisconnectClaude)
+        case .openai:
+            return (onRefreshOpenAI, onConnectOpenAI, onDisconnectOpenAI)
         }
+    }
+
+    private func providerAccentColor(for provider: UsageProvider) -> Color {
+        switch provider {
+        case .cursor:
+            return .blue
+        case .claude:
+            return .purple
+        case .openai:
+            return .green
+        }
+    }
+
+    private func showsResetInHeader(for provider: UsageProvider) -> Bool {
+        provider == .openai || provider == .cursor
     }
 }
 

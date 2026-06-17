@@ -2,9 +2,9 @@
 
 ![AIMeter logo](docs/brand/aimeter-logo.svg)
 
-AIMeter is a minimal macOS menu bar app for tracking personal Cursor and Claude usage from authenticated local web sessions. It gives you a quiet, glanceable dashboard for the usage numbers that usually live several clicks deep in provider settings.
+AIMeter is a minimal macOS menu bar app for tracking personal Cursor, Claude, and OpenAI usage from authenticated local web sessions. It gives you a quiet, glanceable dashboard for the usage numbers that usually live several clicks deep in provider settings.
 
-> AIMeter is an experimental, unofficial Cursor and Claude integration. It does not use provider APIs, and it may need updates when provider account pages change.
+> AIMeter is an experimental, unofficial Cursor, Claude, and OpenAI integration. It does not use provider APIs, and it may need updates when provider account pages change.
 
 ![AIMeter menu bar dashboard screenshot](docs/screenshots/menu-popover.png)
 
@@ -13,6 +13,7 @@ AIMeter is a minimal macOS menu bar app for tracking personal Cursor and Claude 
 - Native macOS menu bar utility with no Dock icon.
 - Tracks Cursor total, Auto, and API usage.
 - Tracks Claude plan usage, reset time, and model limits when available.
+- Tracks OpenAI ChatGPT Plus Codex usage: 5-hour limit, weekly limit, and credits from the Codex analytics page.
 - Uses local web sessions, so no API key is required.
 - Keeps the latest successful usage snapshot visible if a background refresh fails.
 - Optional menu bar display of Cursor Auto and API usage percentages beside the progress bar, or instead of it when the progress bar is hidden in Settings.
@@ -40,7 +41,7 @@ AIMeter is a menu bar app, so it does not appear in the Dock. After launch, look
 ### First Setup
 
 1. Click the AIMeter menu bar item.
-2. Click `Connect Cursor` or `Connect Claude`.
+2. Click `Connect Cursor`, `Connect Claude`, or `Connect OpenAI`.
 3. Sign in to the provider in the connection window.
 4. AIMeter closes the connection window after it detects your usage data.
 
@@ -52,11 +53,11 @@ Download the newer `AIMeter.dmg` from GitHub Releases, drag the new `AIMeter` ap
 
 ## How It Works
 
-AIMeter reads the same usage information you can see after signing in on Cursor and Claude account/settings pages.
+AIMeter reads the same usage information you can see after signing in on Cursor, Claude, and OpenAI account/settings pages.
 
 - It opens each provider in a local browser view owned by AIMeter.
 - Your sign-in sessions stay local to AIMeter.
-- AIMeter only loads HTTPS pages from allowed Cursor and Claude hosts.
+- AIMeter only loads HTTPS pages from allowed Cursor, Claude, and ChatGPT hosts.
 - It reads the usage values shown by each provider and displays them in the menu bar.
 - It keeps the latest successful snapshot visible if a later refresh fails.
 - It never sends your usage data to an AIMeter server.
@@ -69,6 +70,9 @@ Disconnecting a provider from AIMeter clears that provider's local sign-in data.
 | --- | --- |
 | Cursor | Plan label, total usage percentage, Auto usage percentage, API usage percentage |
 | Claude | Plan label, session usage percentage, reset time, All models usage, Claude Design usage |
+| OpenAI | Plan label (e.g. ChatGPT Plus), Codex 5-hour usage %, weekly usage %, credits balance, reset times |
+
+OpenAI usage is read from the signed-in [Codex analytics](https://chatgpt.com/codex/cloud/settings/analytics) page, not the OpenAI API. Email login is recommended in the connection window; Google and Apple sign-in are blocked inside embedded WebViews.
 
 ## Privacy
 
@@ -76,7 +80,7 @@ AIMeter stores provider login state locally on your Mac. It does not ask for API
 
 Important notes:
 
-- AIMeter only loads HTTPS provider pages from allowed Cursor and Claude hosts.
+- AIMeter only loads HTTPS provider pages from allowed Cursor, Claude, and ChatGPT hosts.
 - Provider sessions can expire and require reconnecting.
 - Disconnecting a provider clears AIMeter's local sign-in data for that provider.
 - Do not include personal account data, cookies, or unredacted screenshots in issues or pull requests.
@@ -88,7 +92,7 @@ Important notes:
 ## Limitations
 
 - AIMeter relies on authenticated local web sessions.
-- Cursor and Claude can change routes, DOM structure, response shapes, or copy at any time.
+- Cursor, Claude, and OpenAI can change routes, DOM structure, response shapes, or copy at any time.
 - Background refresh may fail until you reconnect after session expiry.
 - Usage values are only as accurate as the provider pages AIMeter can read.
 

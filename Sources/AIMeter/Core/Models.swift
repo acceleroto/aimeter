@@ -3,14 +3,45 @@ import Foundation
 struct MenuBarAppearanceSettings: Codable, Equatable {
     var showProgressBar: Bool
     var showCursorAutoAPIPercentages: Bool
+    var showOpenAICodexPercentages: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case showProgressBar
+        case showCursorAutoAPIPercentages
+        case showOpenAICodexPercentages
+    }
+
+    init(
+        showProgressBar: Bool,
+        showCursorAutoAPIPercentages: Bool,
+        showOpenAICodexPercentages: Bool = false
+    ) {
+        self.showProgressBar = showProgressBar
+        self.showCursorAutoAPIPercentages = showCursorAutoAPIPercentages
+        self.showOpenAICodexPercentages = showOpenAICodexPercentages
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        showProgressBar = try container.decodeIfPresent(Bool.self, forKey: .showProgressBar) ?? Self.default.showProgressBar
+        showCursorAutoAPIPercentages = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .showCursorAutoAPIPercentages
+        ) ?? Self.default.showCursorAutoAPIPercentages
+        showOpenAICodexPercentages = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .showOpenAICodexPercentages
+        ) ?? Self.default.showOpenAICodexPercentages
+    }
 
     static let `default` = MenuBarAppearanceSettings(
         showProgressBar: true,
-        showCursorAutoAPIPercentages: false
+        showCursorAutoAPIPercentages: false,
+        showOpenAICodexPercentages: false
     )
 
     var hasAtLeastOneDisplayOption: Bool {
-        showProgressBar || showCursorAutoAPIPercentages
+        showProgressBar || showCursorAutoAPIPercentages || showOpenAICodexPercentages
     }
 
     func normalized() -> MenuBarAppearanceSettings {
@@ -29,6 +60,7 @@ struct AppSettings: Codable, Equatable {
     var hasCompletedInitialSetup: Bool
     var cursor: CursorSettings
     var claude: ClaudeSettings
+    var openAI: OpenAISettings
     var menuBar: MenuBarAppearanceSettings
 
     private enum CodingKeys: String, CodingKey {
@@ -36,6 +68,7 @@ struct AppSettings: Codable, Equatable {
         case hasCompletedInitialSetup
         case cursor
         case claude
+        case openAI
         case menuBar
     }
 
@@ -44,12 +77,14 @@ struct AppSettings: Codable, Equatable {
         hasCompletedInitialSetup: Bool,
         cursor: CursorSettings,
         claude: ClaudeSettings,
+        openAI: OpenAISettings = .default,
         menuBar: MenuBarAppearanceSettings = .default
     ) {
         self.pollIntervalSeconds = pollIntervalSeconds
         self.hasCompletedInitialSetup = hasCompletedInitialSetup
         self.cursor = cursor
         self.claude = claude
+        self.openAI = openAI
         self.menuBar = menuBar
     }
 
@@ -66,6 +101,7 @@ struct AppSettings: Codable, Equatable {
         ) ?? Self.default.hasCompletedInitialSetup
         cursor = try container.decodeIfPresent(CursorSettings.self, forKey: .cursor) ?? .default
         claude = try container.decodeIfPresent(ClaudeSettings.self, forKey: .claude) ?? .default
+        openAI = try container.decodeIfPresent(OpenAISettings.self, forKey: .openAI) ?? .default
         menuBar = try container.decodeIfPresent(MenuBarAppearanceSettings.self, forKey: .menuBar) ?? .default
     }
 
@@ -75,6 +111,7 @@ struct AppSettings: Codable, Equatable {
         try container.encode(hasCompletedInitialSetup, forKey: .hasCompletedInitialSetup)
         try container.encode(cursor, forKey: .cursor)
         try container.encode(claude, forKey: .claude)
+        try container.encode(openAI, forKey: .openAI)
         try container.encode(menuBar, forKey: .menuBar)
     }
 
@@ -83,6 +120,7 @@ struct AppSettings: Codable, Equatable {
         hasCompletedInitialSetup: false,
         cursor: .default,
         claude: .default,
+        openAI: .default,
         menuBar: .default
     )
 }
@@ -103,9 +141,18 @@ struct ClaudeSettings: Codable, Equatable {
     )
 }
 
+struct OpenAISettings: Codable, Equatable {
+    var usagePageURL: String
+
+    static let `default` = OpenAISettings(
+        usagePageURL: "https://chatgpt.com/codex/cloud/settings/analytics"
+    )
+}
+
 enum UsageProvider: String, CaseIterable, Codable, Equatable {
     case cursor
     case claude
+    case openai
 
     var displayName: String {
         switch self {
@@ -113,6 +160,8 @@ enum UsageProvider: String, CaseIterable, Codable, Equatable {
             return "Cursor"
         case .claude:
             return "Claude"
+        case .openai:
+            return "OpenAI"
         }
     }
 }
@@ -182,6 +231,15 @@ struct ProviderUsageSnapshot: Equatable {
         connectionState: .disconnected
     )
 
+    static let openaiDisconnected = ProviderUsageSnapshot(
+        provider: .openai,
+        planLabel: "OpenAI",
+        primaryMetric: UsageMetric(title: "5-hour", value: "Not connected"),
+        secondaryMetrics: [],
+        fetchedAt: nil,
+        connectionState: .disconnected
+    )
+
     init(
         provider: UsageProvider,
         planLabel: String,
@@ -203,9 +261,19 @@ struct ProviderUsageSnapshot: Equatable {
         totalUsedPercent: Double,
         autoUsedPercent: Double,
         apiUsedPercent: Double,
+        resetDisplay: String? = nil,
         fetchedAt: Date?,
         connectionState: ProviderConnectionState
     ) {
+        var secondaryMetrics = [
+            UsageMetric(title: "Auto", value: DisplayFormatting.percent(autoUsedPercent), percent: autoUsedPercent),
+            UsageMetric(title: "API", value: DisplayFormatting.percent(apiUsedPercent), percent: apiUsedPercent)
+        ]
+
+        if let resetDisplay {
+            secondaryMetrics.append(UsageMetric(title: "Reset", value: resetDisplay))
+        }
+
         self.init(
             provider: .cursor,
             planLabel: planLabel,
@@ -214,10 +282,7 @@ struct ProviderUsageSnapshot: Equatable {
                 value: DisplayFormatting.percent(totalUsedPercent),
                 percent: totalUsedPercent
             ),
-            secondaryMetrics: [
-                UsageMetric(title: "Auto", value: DisplayFormatting.percent(autoUsedPercent), percent: autoUsedPercent),
-                UsageMetric(title: "API", value: DisplayFormatting.percent(apiUsedPercent), percent: apiUsedPercent)
-            ],
+            secondaryMetrics: secondaryMetrics,
             fetchedAt: fetchedAt,
             connectionState: connectionState
         )
@@ -239,6 +304,10 @@ struct ProviderUsageSnapshot: Equatable {
         metricPercent(named: "API")
     }
 
+    var weeklyUsedPercent: Double {
+        metricPercent(named: "Weekly")
+    }
+
     func withConnectionState(_ state: ProviderConnectionState) -> ProviderUsageSnapshot {
         ProviderUsageSnapshot(
             provider: provider,
@@ -248,6 +317,26 @@ struct ProviderUsageSnapshot: Equatable {
             fetchedAt: fetchedAt,
             connectionState: state
         )
+    }
+
+    func replacingResetDisplay(_ resetDisplay: String?) -> ProviderUsageSnapshot {
+        guard provider == .cursor else {
+            return self
+        }
+
+        return CursorUsageSnapshot(
+            planLabel: planLabel,
+            totalUsedPercent: totalUsedPercent,
+            autoUsedPercent: autoUsedPercent,
+            apiUsedPercent: apiUsedPercent,
+            resetDisplay: resetDisplay,
+            fetchedAt: fetchedAt,
+            connectionState: connectionState
+        )
+    }
+
+    var resetDisplayValue: String? {
+        secondaryMetrics.first { $0.title.caseInsensitiveCompare("Reset") == .orderedSame }?.value
     }
 
     private func metricPercent(named title: String) -> Double {
@@ -269,7 +358,7 @@ struct DashboardState: Equatable {
 
     static let initial = DashboardState(
         presentationState: .firstRun,
-        providerSnapshots: [.cursorDisconnected, .claudeDisconnected],
+        providerSnapshots: [.cursorDisconnected, .claudeDisconnected, .openaiDisconnected],
         lastRefreshAt: nil
     )
 
@@ -279,6 +368,10 @@ struct DashboardState: Equatable {
 
     var claudeSnapshot: ProviderUsageSnapshot {
         snapshot(for: .claude)
+    }
+
+    var openaiSnapshot: ProviderUsageSnapshot {
+        snapshot(for: .openai)
     }
 
     var connectedProviderSnapshots: [ProviderUsageSnapshot] {
@@ -311,6 +404,8 @@ struct DashboardState: Equatable {
             return .cursorDisconnected
         case .claude:
             return .claudeDisconnected
+        case .openai:
+            return .openaiDisconnected
         }
     }
 }

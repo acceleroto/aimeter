@@ -13,6 +13,7 @@ struct AIMeterApp: App {
                 dashboardStore: environment.dashboardStore,
                 cursorUsageCoordinator: environment.cursorUsageCoordinator,
                 claudeUsageCoordinator: environment.claudeUsageCoordinator,
+                openAIUsageCoordinator: environment.openAIUsageCoordinator,
                 launchAtLoginController: environment.launchAtLoginController
             )
         }

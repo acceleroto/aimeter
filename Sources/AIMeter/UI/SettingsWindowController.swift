@@ -8,6 +8,7 @@ final class SettingsWindowController: NSWindowController {
         dashboardStore: DashboardStore,
         cursorUsageCoordinator: CursorUsageCoordinator,
         claudeUsageCoordinator: ClaudeUsageCoordinator,
+        openAIUsageCoordinator: OpenAIUsageCoordinator,
         launchAtLoginController: LaunchAtLoginController
     ) {
         let hostingController = NSHostingController(
@@ -16,6 +17,7 @@ final class SettingsWindowController: NSWindowController {
                 dashboardStore: dashboardStore,
                 cursorUsageCoordinator: cursorUsageCoordinator,
                 claudeUsageCoordinator: claudeUsageCoordinator,
+                openAIUsageCoordinator: openAIUsageCoordinator,
                 launchAtLoginController: launchAtLoginController
             )
         )

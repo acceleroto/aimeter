@@ -12,11 +12,12 @@ final class DashboardStore: ObservableObject {
     init(
         settingsStore: SettingsStore,
         cursorUsageCoordinator: CursorUsageCoordinator,
-        claudeUsageCoordinator: ClaudeUsageCoordinator? = nil
+        claudeUsageCoordinator: ClaudeUsageCoordinator? = nil,
+        openAIUsageCoordinator: OpenAIUsageCoordinator? = nil
     ) {
         self.settingsStore = settingsStore
 
-        let coordinators = [cursorUsageCoordinator, claudeUsageCoordinator].compactMap { $0 }
+        let coordinators = [cursorUsageCoordinator, claudeUsageCoordinator, openAIUsageCoordinator].compactMap { $0 }
         for coordinator in coordinators {
             snapshotsByProvider[coordinator.provider] = coordinator.snapshot
 
