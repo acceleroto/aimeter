@@ -17,6 +17,6 @@ Do not include live credentials, session cookies, or personal account data in re
 
 ## Scope notes
 
-AIMeter uses an authenticated local Cursor web session to read Cursor usage pages. It only loads HTTPS Cursor URLs from `cursor.com` or `www.cursor.com`, and its response parser ignores non-Cursor hosts. Bugs in parsing logic, local storage, or packaging may have security implications and should be reported privately when in doubt.
+AIMeter uses an authenticated local Cursor web session to read Cursor usage pages. It loads HTTPS usage pages from `cursor.com` or `www.cursor.com`, and it only parses intercepted dashboard responses from those hosts plus `api2.cursor.sh`. Bugs in parsing logic, local storage, or packaging may have security implications and should be reported privately when in doubt.
 
 Cursor credentials, cookies, billing details, account identifiers, and exact personal usage values should never be posted in public issues, pull requests, or screenshots.

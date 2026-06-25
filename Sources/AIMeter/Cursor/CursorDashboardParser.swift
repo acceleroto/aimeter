@@ -48,11 +48,39 @@ enum CursorDashboardParser {
     }
 
     static func parseResponseBody(_ body: String, sourceURL: String) -> ParseResult {
-        guard CursorURLValidator.isAllowedCursorURLString(sourceURL) else {
+        guard CursorURLValidator.isAllowedCursorResponseURLString(sourceURL) else {
             return .noMatch
         }
 
         return parseResponseBody(body, sourceURL: sourceURL, allowAuthDetection: false)
+    }
+
+    static func parsePlanInfoLabel(fromResponseBody body: String, sourceURL: String) -> String? {
+        guard isSupplementalPlanInfoResponseURL(sourceURL) else {
+            return nil
+        }
+
+        let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmedBody.data(using: .utf8),
+              let jsonObject = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = jsonObject as? [String: Any]
+        else {
+            return nil
+        }
+
+        return resolvedPlanLabel(from: dictionary)
+    }
+
+    static func isAuthoritativeUsageResponseURL(_ sourceURL: String) -> Bool {
+        let lowercased = sourceURL.lowercased()
+        return lowercased.contains("get-current-period-usage")
+            || lowercased.contains("getcurrentperiodusage")
+    }
+
+    static func isSupplementalPlanInfoResponseURL(_ sourceURL: String) -> Bool {
+        let lowercased = sourceURL.lowercased()
+        return lowercased.contains("get-plan-info")
+            || lowercased.contains("getplaninfo")
     }
 
     static func parseDOMText(_ text: String, sourceURL: String) -> ParseResult {
@@ -68,90 +96,244 @@ enum CursorDashboardParser {
         if let data = trimmedBody.data(using: .utf8),
            let jsonObject = try? JSONSerialization.jsonObject(with: data)
         {
-            if let snapshot = parseJSONObject(jsonObject, sourceURL: sourceURL) {
+            if let dictionary = jsonObject as? [String: Any],
+               let snapshot = parseStructuredUsagePayload(dictionary, sourceURL: sourceURL)
+            {
                 return .usage(snapshot)
             }
 
-            let text = DashboardParserSupport.jsonLeafStrings(from: jsonObject).joined(separator: " ")
-            let textResult = parseText(text, sourceURL: sourceURL, allowAuthDetection: allowAuthDetection)
-            if textResult != .noMatch {
-                return textResult
+            if isAuthoritativeUsageResponseURL(sourceURL) || isSupplementalPlanInfoResponseURL(sourceURL) {
+                return .noMatch
+            }
+
+            if let dictionary = jsonObject as? [String: Any],
+               let snapshot = parseLegacyUsagePayload(dictionary, sourceURL: sourceURL)
+            {
+                return .usage(snapshot)
             }
         }
 
-        return parseText(
-            DashboardParserSupport.stripHTML(from: trimmedBody),
-            sourceURL: sourceURL,
-            allowAuthDetection: allowAuthDetection
-        )
+        return .noMatch
     }
 
     private static func parseJSONObject(_ object: Any, sourceURL: String) -> CursorUsageSnapshot? {
-        let leaves = DashboardParserSupport.numericLeaves(from: object)
-        guard !leaves.isEmpty else {
+        guard let dictionary = object as? [String: Any] else {
             return nil
         }
 
-        let total = bestPercent(
-            in: leaves,
-            preferredKeys: [["total"], ["overall"], ["aggregate"]]
-        )
+        return parseStructuredUsagePayload(dictionary, sourceURL: sourceURL)
+            ?? parseLegacyUsagePayload(dictionary, sourceURL: sourceURL)
+    }
 
-        let auto = bestPercent(
-            in: leaves,
-            preferredKeys: [["auto"]]
-        )
-
-        let api = bestPercent(
-            in: leaves,
-            preferredKeys: [["api"]]
-        )
-
-        guard let total, let auto, let api else {
+    private static func parseLegacyUsagePayload(
+        _ object: [String: Any],
+        sourceURL: String
+    ) -> CursorUsageSnapshot? {
+        guard let usage = object["usage"] as? [String: Any] else {
             return nil
         }
 
-        let planLabel = DashboardParserSupport.jsonLeafStrings(from: object)
-            .first(where: isPlanLabel) ?? "Cursor Plan"
+        let breakdown = usage["breakdown"] as? [String: Any] ?? usage
 
-        let resetDisplay: String?
-        if isBillingSource(sourceURL) {
-            let leafText = DashboardParserSupport.jsonLeafStrings(from: object).joined(separator: "\n")
-            resetDisplay = bestBillingResetDate(fromJSONObject: object).map {
-                DisplayFormatting.resetInDays(until: $0)
-            } ?? bestBillingResetDisplay(in: leafText)
-        } else {
-            resetDisplay = nil
+        guard let total = usagePercent(from: usage["totalUsedPercent"])
+            ?? usagePercent(from: usage["totalPercentUsed"])
+        else {
+            return nil
+        }
+
+        guard let auto = usagePercent(from: breakdown["autoUsedPercent"])
+            ?? usagePercent(from: breakdown["autoPercentUsed"])
+        else {
+            return nil
+        }
+
+        guard let api = usagePercent(from: breakdown["apiUsedPercent"])
+            ?? usagePercent(from: breakdown["apiPercentUsed"])
+        else {
+            return nil
         }
 
         return makeSnapshot(
-            planLabel: planLabel,
+            planLabel: resolvedPlanLabel(from: object) ?? "Cursor Plan",
             totalUsedPercent: total,
             autoUsedPercent: auto,
             apiUsedPercent: api,
-            resetDisplay: resetDisplay
+            resetDisplay: billingResetDisplay(from: object, sourceURL: sourceURL)
         )
     }
 
-    private static func bestPercent(
-        in leaves: [(path: [String], value: Double)],
-        preferredKeys: [[String]]
-    ) -> Double? {
-        for preferred in preferredKeys {
-            if let match = leaves.first(where: {
-                DashboardParserSupport.containsAllKeywords($0.path, preferred)
-                    && DashboardParserSupport.looksLikePercentPath($0.path)
-            }) {
-                return DashboardParserSupport.normalizePercent(match.value)
+    private static func parseStructuredUsagePayload(
+        _ object: [String: Any],
+        sourceURL: String
+    ) -> CursorUsageSnapshot? {
+        guard let planUsage = object["planUsage"] as? [String: Any] else {
+            return nil
+        }
+
+        guard let total = planUsagePercent(from: planUsage["totalPercentUsed"])
+            ?? computedTotalPercent(from: planUsage)
+        else {
+            return nil
+        }
+
+        let auto = planUsagePercent(from: planUsage["autoPercentUsed"])
+        let api = planUsagePercent(from: planUsage["apiPercentUsed"])
+
+        guard auto != nil || api != nil else {
+            return nil
+        }
+
+        return makeSnapshot(
+            planLabel: resolvedPlanLabel(from: object) ?? "Cursor Plan",
+            totalUsedPercent: planUsagePercent(from: planUsage["totalPercentUsed"]) ?? total,
+            autoUsedPercent: auto ?? 0,
+            apiUsedPercent: api ?? 0,
+            resetDisplay: billingResetDisplay(from: object, sourceURL: sourceURL)
+        )
+    }
+
+    private static func planUsagePercent(from value: Any?) -> Double? {
+        guard let number = value as? NSNumber else {
+            return nil
+        }
+
+        let double = number.doubleValue
+        guard double.isFinite else {
+            return nil
+        }
+
+        return min(max(double, 0), 100)
+    }
+
+    private static func usagePercent(from value: Any?) -> Double? {
+        guard let number = value as? NSNumber else {
+            return nil
+        }
+
+        let double = number.doubleValue
+        guard double.isFinite else {
+            return nil
+        }
+
+        return DashboardParserSupport.normalizePercent(double)
+    }
+
+    private static func computedTotalPercent(from planUsage: [String: Any]) -> Double? {
+        guard let limit = numericValue(from: planUsage["limit"]), limit > 0 else {
+            return nil
+        }
+
+        let remaining = numericValue(from: planUsage["remaining"]) ?? 0
+        let used = max(limit - remaining, 0)
+        return min((used / limit) * 100, 100)
+    }
+
+    private static func numericValue(from value: Any?) -> Double? {
+        guard let number = value as? NSNumber else {
+            return nil
+        }
+
+        let double = number.doubleValue
+        guard double.isFinite else {
+            return nil
+        }
+
+        return double
+    }
+
+    private static func resolvedPlanLabel(from object: [String: Any]) -> String? {
+        if let planInfo = object["planInfo"] as? [String: Any],
+           let planName = planInfo["planName"] as? String
+        {
+            return formattedPlanLabel(planName)
+        }
+
+        if let plan = object["plan"] as? [String: Any],
+           let label = plan["label"] as? String,
+           isPlanLabel(label)
+        {
+            return label
+        }
+
+        if let planName = object["planName"] as? String {
+            return formattedPlanLabel(planName)
+        }
+
+        return DashboardParserSupport.jsonLeafStrings(from: object).first(where: isPlanLabel)
+    }
+
+    private static func formattedPlanLabel(_ planName: String) -> String {
+        let trimmed = DashboardParserSupport.normalizeWhitespace(planName)
+        guard !trimmed.isEmpty else {
+            return "Cursor Plan"
+        }
+
+        if isPlanLabel(trimmed) {
+            return trimmed
+        }
+
+        if trimmed.range(
+            of: "^(?:Free|Hobby|Pro\\+?|Ultra|Team|Enterprise)\\b",
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return "Included in \(trimmed)"
+        }
+
+        return trimmed
+    }
+
+    private static func billingResetDisplay(
+        from object: [String: Any],
+        sourceURL: String,
+        referenceDate: Date = Date()
+    ) -> String? {
+        if let date = billingCycleEndDate(from: object, referenceDate: referenceDate) {
+            return DisplayFormatting.resetInDays(until: date, from: referenceDate)
+        }
+
+        if isBillingSource(sourceURL) {
+            let leafText = DashboardParserSupport.jsonLeafStrings(from: object).joined(separator: "\n")
+            return bestBillingResetDisplay(in: leafText, referenceDate: referenceDate)
+        }
+
+        return nil
+    }
+
+    private static func billingCycleEndDate(
+        from object: [String: Any],
+        referenceDate: Date = Date()
+    ) -> Date? {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: referenceDate)
+
+        for key in ["billingCycleEnd", "cycleEnd"] {
+            if let date = parseBillingTimestamp(object[key]), calendar.startOfDay(for: date) >= startOfToday {
+                return date
             }
         }
 
-        for preferred in preferredKeys {
-            if let match = leaves.first(where: {
-                DashboardParserSupport.containsAllKeywords($0.path, preferred)
-            }) {
-                return DashboardParserSupport.normalizePercent(match.value)
+        if let planInfo = object["planInfo"] as? [String: Any],
+           let date = parseBillingTimestamp(planInfo["billingCycleEnd"]),
+           calendar.startOfDay(for: date) >= startOfToday
+        {
+            return date
+        }
+
+        return bestBillingResetDate(fromJSONObject: object, referenceDate: referenceDate)
+    }
+
+    private static func parseBillingTimestamp(_ value: Any?) -> Date? {
+        if let string = value as? String {
+            return parseISO8601Date(string)
+        }
+
+        if let number = value as? NSNumber {
+            let timestamp = number.doubleValue
+            guard timestamp > 0 else {
+                return nil
             }
+
+            return Date(timeIntervalSince1970: timestamp > 10_000_000_000 ? timestamp / 1000 : timestamp)
         }
 
         return nil
@@ -167,28 +349,40 @@ enum CursorDashboardParser {
             return .authRequired
         }
 
+        guard let sectionText = includedUsageSection(from: rawText) else {
+            return .noMatch
+        }
+
+        let section = DashboardParserSupport.normalizeWhitespace(sectionText)
+
         guard
             let planLabel = DashboardParserSupport.firstMatch(
-                in: text,
+                in: section,
                 pattern: "(Included in\\s+(?:Free|Hobby|Pro\\+?|Ultra(?:\\s+[A-Za-z0-9+]+)?))"
+            ) ?? DashboardParserSupport.firstMatch(
+                in: section,
+                pattern: "((?:Free|Hobby|Pro\\+?|Ultra|Team|Enterprise)\\s+plan)"
             ),
             let totalPercent = DashboardParserSupport.firstMatch(
-                in: text,
+                in: section,
                 pattern: "Total\\s+(\\d+(?:\\.\\d+)?)%"
             ),
-            let autoPercent = DashboardParserSupport.firstMatch(
-                in: text,
-                pattern: "(\\d+(?:\\.\\d+)?)%\\s+Auto"
-            ),
-            let apiPercent = DashboardParserSupport.firstMatch(
-                in: text,
-                pattern: "(\\d+(?:\\.\\d+)?)%\\s+API"
-            ),
-            let total = Double(totalPercent),
-            let auto = Double(autoPercent),
-            let api = Double(apiPercent)
+            let breakdown = parseUsageBreakdownPercents(in: section),
+            let total = Double(totalPercent)
         else {
             return .noMatch
+        }
+
+        let normalizedPlanLabel: String
+        if planLabel.lowercased().hasSuffix("plan") {
+            let trimmedPlan = planLabel.replacingOccurrences(
+                of: "\\s+plan$",
+                with: "",
+                options: [.regularExpression, .caseInsensitive]
+            )
+            normalizedPlanLabel = "Included in \(trimmedPlan)"
+        } else {
+            normalizedPlanLabel = planLabel
         }
 
         let resetDisplay = isBillingSource(sourceURL)
@@ -197,13 +391,55 @@ enum CursorDashboardParser {
 
         return .usage(
             makeSnapshot(
-                planLabel: planLabel,
+                planLabel: normalizedPlanLabel,
                 totalUsedPercent: total,
-                autoUsedPercent: auto,
-                apiUsedPercent: api,
+                autoUsedPercent: breakdown.auto,
+                apiUsedPercent: breakdown.api,
                 resetDisplay: resetDisplay
             )
         )
+    }
+
+    private static func includedUsageSection(from text: String) -> String? {
+        guard let range = text.range(of: "Included", options: .caseInsensitive) else {
+            return nil
+        }
+
+        return String(text[range.lowerBound...].prefix(800))
+    }
+
+    private static func parseUsageBreakdownPercents(in section: String) -> (auto: Double, api: Double)? {
+        let combinedPattern = "(\\d+(?:\\.\\d+)?)%\\s+Auto(?:\\s*\\+\\s*Composer)?\\s+and\\s+(\\d+(?:\\.\\d+)?)%\\s+API"
+        if let regex = try? NSRegularExpression(pattern: combinedPattern),
+           let match = regex.firstMatch(in: section, range: NSRange(section.startIndex..., in: section)),
+           match.numberOfRanges >= 3,
+           let autoRange = Range(match.range(at: 1), in: section),
+           let apiRange = Range(match.range(at: 2), in: section),
+           let auto = Double(section[autoRange]),
+           let api = Double(section[apiRange])
+        {
+            return (auto, api)
+        }
+
+        guard
+            let autoPercent = DashboardParserSupport.firstMatch(
+                in: section,
+                pattern: "(\\d+(?:\\.\\d+)?)%\\s+Auto(?:\\s*\\+\\s*Composer)?"
+            ) ?? DashboardParserSupport.firstMatch(
+                in: section,
+                pattern: "(\\d+(?:\\.\\d+)?)%\\s+Auto"
+            ),
+            let apiPercent = DashboardParserSupport.firstMatch(
+                in: section,
+                pattern: "(\\d+(?:\\.\\d+)?)%\\s+API"
+            ),
+            let auto = Double(autoPercent),
+            let api = Double(apiPercent)
+        else {
+            return nil
+        }
+
+        return (auto, api)
     }
 
     private static func makeSnapshot(

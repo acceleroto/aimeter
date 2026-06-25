@@ -30,7 +30,7 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(userDefaults: userDefaults)
 
         XCTAssertFalse(store.settings.hasCompletedInitialSetup)
-        XCTAssertEqual(store.settings.cursor.usagePageURL, "https://www.cursor.com/settings")
+        XCTAssertEqual(store.settings.cursor.usagePageURL, "https://cursor.com/dashboard/spending")
     }
 
     func testInvalidLegacyCursorURLFallsBackToDefault() throws {

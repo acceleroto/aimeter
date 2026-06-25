@@ -211,6 +211,156 @@ final class CursorDashboardParserTests: XCTestCase {
         XCTAssertEqual(reset, DisplayFormatting.resetInDays(until: resetDate, from: reference))
     }
 
+    func testParsesConnectAPIUsagePayload() {
+        let endDate = Calendar.current.date(byAdding: .day, value: 9, to: Date())!
+        let endMs = String(Int(endDate.timeIntervalSince1970 * 1000))
+
+        let payload = """
+        {
+          "billingCycleEnd": "\(endMs)",
+          "planUsage": {
+            "totalPercentUsed": 15.48,
+            "autoPercentUsed": 5.6,
+            "apiPercentUsed": 46.44,
+            "limit": 40000,
+            "remaining": 16778
+          }
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.planLabel, "Cursor Plan")
+        XCTAssertEqual(snapshot.totalUsedPercent, 15.48, accuracy: 0.01)
+        XCTAssertEqual(snapshot.autoUsedPercent, 5.6, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 46.44, accuracy: 0.01)
+
+        let reset = snapshot.secondaryMetrics.first { $0.title == "Reset" }
+        XCTAssertEqual(reset?.value, "Resets in 9 days")
+    }
+
+    func testParsesConnectAPIPlanInfoPayload() {
+        let payload = """
+        {
+          "planInfo": {
+            "planName": "Pro+",
+            "billingCycleEnd": "1771077734000"
+          },
+          "planUsage": {
+            "totalPercentUsed": 13,
+            "autoPercentUsed": 4,
+            "apiPercentUsed": 48
+          }
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.planLabel, "Included in Pro+")
+    }
+
+    func testParsesSpendingDashboardDOMWithAutoComposerLabels() {
+        let text = """
+        Included in Pro+
+        Total
+        13%
+        4% Auto + Composer and 48% API used
+        """
+
+        let result = CursorDashboardParser.parseDOMText(
+            text,
+            sourceURL: "https://cursor.com/dashboard/spending"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.totalUsedPercent, 13, accuracy: 0.01)
+        XCTAssertEqual(snapshot.autoUsedPercent, 4, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 48, accuracy: 0.01)
+    }
+
+    func testParsesCursorDashboardProxyUsagePayload() {
+        let payload = """
+        {
+          "billingCycleEnd": "1771077734000",
+          "planUsage": {
+            "totalPercentUsed": 15.48,
+            "autoPercentUsed": 58.0,
+            "apiPercentUsed": 1.0
+          }
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://cursor.com/api/dashboard/get-current-period-usage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.totalUsedPercent, 15.48, accuracy: 0.01)
+        XCTAssertEqual(snapshot.autoUsedPercent, 58, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 1, accuracy: 0.01)
+    }
+
+    func testIgnoresMisleadingAPIPercentagesOutsideIncludedSection() {
+        let text = """
+        On-demand usage
+        59% API
+        Included in Pro+
+        Total
+        13%
+        58% Auto + Composer and 1% API used
+        """
+
+        let result = CursorDashboardParser.parseDOMText(
+            text,
+            sourceURL: "https://cursor.com/dashboard/spending"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.autoUsedPercent, 58, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 1, accuracy: 0.01)
+    }
+
+    func testRejectsUnrelatedJSONWithoutPlanUsage() {
+        let payload = """
+        {
+          "usageEventsDisplay": [
+            { "model": "gpt-4", "apiPercentUsed": 59, "totalCents": 1234 }
+          ]
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://cursor.com/api/dashboard/get-aggregated-usage-events"
+        )
+
+        XCTAssertEqual(result, .noMatch)
+    }
+
     func testParsesDOMTextFixture() {
         let text = """
         Included in Pro+

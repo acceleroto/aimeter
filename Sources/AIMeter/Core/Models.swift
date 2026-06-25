@@ -129,7 +129,7 @@ struct CursorSettings: Codable, Equatable {
     var usagePageURL: String
 
     static let `default` = CursorSettings(
-        usagePageURL: "https://www.cursor.com/settings"
+        usagePageURL: "https://cursor.com/dashboard/spending"
     )
 }
 

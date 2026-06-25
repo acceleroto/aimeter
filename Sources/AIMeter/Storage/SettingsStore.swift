@@ -129,9 +129,19 @@ private extension MenuBarAppearanceSettings {
 }
 
 private extension CursorSettings {
+    static let legacyUsagePageURLs: Set<String> = [
+        "https://www.cursor.com/settings",
+        "https://cursor.com/settings"
+    ]
+
     var mergedWithDefaults: CursorSettings {
-        CursorSettings(
-            usagePageURL: CursorURLValidator.sanitizedUsageURL(usagePageURL)
+        let storedURL = usagePageURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let migratedURL = Self.legacyUsagePageURLs.contains(storedURL)
+            ? Self.default.usagePageURL
+            : storedURL
+
+        return CursorSettings(
+            usagePageURL: CursorURLValidator.sanitizedUsageURL(migratedURL)
         )
     }
 }

@@ -3,6 +3,9 @@ import XCTest
 
 final class CursorURLValidatorTests: XCTestCase {
     func testAcceptsKnownCursorHTTPSHosts() throws {
+        let spendingURL = try CursorURLValidator.validatedUsageURL(
+            from: "https://cursor.com/dashboard/spending"
+        )
         let settingsURL = try CursorURLValidator.validatedUsageURL(
             from: "https://www.cursor.com/settings"
         )
@@ -10,8 +13,22 @@ final class CursorURLValidatorTests: XCTestCase {
             from: " https://cursor.com/settings/account "
         )
 
+        XCTAssertEqual(spendingURL.host, "cursor.com")
         XCTAssertEqual(settingsURL.host, "www.cursor.com")
         XCTAssertEqual(rootURL.host, "cursor.com")
+    }
+
+    func testAcceptsCursorAPIResponseHost() {
+        XCTAssertTrue(
+            CursorURLValidator.isAllowedCursorResponseURLString(
+                "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
+            )
+        )
+        XCTAssertFalse(
+            CursorURLValidator.isAllowedCursorResponseURLString(
+                "https://example.com/api/usage"
+            )
+        )
     }
 
     func testRejectsUnsafeOrUnexpectedURLs() {

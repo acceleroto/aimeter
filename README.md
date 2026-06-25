@@ -53,26 +53,34 @@ Download the newer `AIMeter.dmg` from GitHub Releases, drag the new `AIMeter` ap
 
 ## How It Works
 
-AIMeter reads the same usage information you can see after signing in on Cursor, Claude, and OpenAI account/settings pages.
+AIMeter reads the same usage information you can see after signing in on each provider's account pages.
 
 - It opens each provider in a local browser view owned by AIMeter.
 - Your sign-in sessions stay local to AIMeter.
 - AIMeter only loads HTTPS pages from allowed Cursor, Claude, and ChatGPT hosts.
-- It reads the usage values shown by each provider and displays them in the menu bar.
+- For Cursor, it reads the signed-in [spending dashboard](https://cursor.com/dashboard/spending) and the dashboard's `get-current-period-usage` response, then displays total, Auto + Composer, and API percentages in the menu bar.
 - It keeps the latest successful snapshot visible if a later refresh fails.
 - It never sends your usage data to an AIMeter server.
 
 Disconnecting a provider from AIMeter clears that provider's local sign-in data. Sessions can still expire normally, in which case AIMeter will ask you to reconnect.
 
+### Cursor notes
+
+- Cursor usage is read from the spending dashboard, not the older `cursor.com/settings` page.
+- AIMeter migrates saved settings that still point at the old settings URL to the spending dashboard automatically.
+- If usage looks wrong or sync fails after a Cursor dashboard change, disconnect and reconnect Cursor once before opening an issue.
+
 ## What AIMeter Tracks
 
-| Provider | Metrics |
-| --- | --- |
-| Cursor | Plan label, total usage percentage, Auto usage percentage, API usage percentage |
-| Claude | Plan label, session usage percentage, reset time, All models usage, Claude Design usage |
-| OpenAI | Plan label (e.g. ChatGPT Plus), Codex 5-hour usage %, weekly usage %, credits balance, reset times |
+| Provider | Metrics | Source page |
+| --- | --- | --- |
+| Cursor | Plan label, total usage percentage, Auto usage percentage, API usage percentage | [cursor.com/dashboard/spending](https://cursor.com/dashboard/spending) |
+| Claude | Plan label, session usage percentage, reset time, All models usage, Claude Design usage | [claude.ai/settings/usage](https://claude.ai/settings/usage) |
+| OpenAI | Plan label (e.g. ChatGPT Plus), Codex 5-hour usage %, weekly usage %, credits balance, reset times | [Codex analytics](https://chatgpt.com/codex/cloud/settings/analytics) |
 
-OpenAI usage is read from the signed-in [Codex analytics](https://chatgpt.com/codex/cloud/settings/analytics) page, not the OpenAI API. Email login is recommended in the connection window; Google and Apple sign-in are blocked inside embedded WebViews.
+Cursor usage comes from the spending dashboard's included-usage block and its `get-current-period-usage` response, not the Cursor desktop app API or an AIMeter server.
+
+OpenAI usage is read from the signed-in Codex analytics page, not the OpenAI API. Email login is recommended in the connection window; Google and Apple sign-in are blocked inside embedded WebViews.
 
 ## Privacy
 
@@ -93,12 +101,29 @@ Important notes:
 
 - AIMeter relies on authenticated local web sessions.
 - Cursor, Claude, and OpenAI can change routes, DOM structure, response shapes, or copy at any time.
+- Cursor is still rolling out the included-usage block on some plans; until it appears on your spending dashboard, AIMeter may not be able to read usage.
 - Background refresh may fail until you reconnect after session expiry.
 - Usage values are only as accurate as the provider pages AIMeter can read.
 
+## Building from source
+
+Prerequisites: macOS 14+, Xcode, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+
+```bash
+brew install xcodegen
+xcodegen generate
+open AIMeter.xcodeproj
+```
+
+Build with **⌘B** or **⌘R** in Xcode. After rebuilding locally, quit any copy of AIMeter already running in the menu bar and launch the new build so you are not still using an older app from `/Applications`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full test and release workflow.
+
 ## Support
 
-Open a GitHub issue if AIMeter cannot connect, the usage values look wrong, or provider settings pages change.
+Open a GitHub issue if AIMeter cannot connect, the usage values look wrong, or a provider dashboard changes.
+
+For Cursor issues, compare AIMeter against the signed-in [spending dashboard](https://cursor.com/dashboard/spending) and try disconnecting and reconnecting once before filing a bug.
 
 Security-sensitive issues should be reported privately. See [SECURITY.md](SECURITY.md).
 

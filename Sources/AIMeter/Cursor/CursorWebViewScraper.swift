@@ -26,6 +26,8 @@ final class CursorWebViewScraper: NSObject {
     private var hasResolved = false
     private var loadPhase: LoadPhase = .usage
     private var pendingUsageSnapshot: CursorUsageSnapshot?
+    private var deferredDOMSnapshot: CursorUsageSnapshot?
+    private var supplementalPlanLabel: String?
     private var billingPhaseStartedAt: Date?
 
     private static let billingPageURL = URL(string: CursorDashboardParser.billingPageURL)!
@@ -68,6 +70,8 @@ final class CursorWebViewScraper: NSObject {
             self.continuation = continuation
             loadPhase = .usage
             pendingUsageSnapshot = nil
+            deferredDOMSnapshot = nil
+            supplementalPlanLabel = nil
             billingPhaseStartedAt = nil
             let request = URLRequest(url: usagePageURL)
             webView.load(request)
@@ -87,6 +91,11 @@ final class CursorWebViewScraper: NSObject {
             await MainActor.run {
                 if let pendingUsageSnapshot = self.pendingUsageSnapshot, self.loadPhase == .billing {
                     self.resolve(.success(pendingUsageSnapshot))
+                    return
+                }
+
+                if let deferredDOMSnapshot = self.deferredDOMSnapshot, self.loadPhase == .usage {
+                    self.beginBillingPhase(with: deferredDOMSnapshot)
                     return
                 }
 
@@ -148,7 +157,7 @@ final class CursorWebViewScraper: NSObject {
             case .usage:
                 switch CursorDashboardParser.parseDOMText(text, sourceURL: url) {
                 case .usage(let snapshot):
-                    beginBillingPhase(with: snapshot)
+                    deferredDOMSnapshot = snapshot
                 case .authRequired where mode == .background:
                     resolve(.failure(CursorUsageError.authExpired))
                 case .authRequired, .noMatch:
@@ -173,15 +182,19 @@ final class CursorWebViewScraper: NSObject {
 
         let body = payload["body"] as? String ?? ""
         let sourceURL = payload["url"] as? String ?? webView.url?.absoluteString ?? usagePageURL.absoluteString
-        guard CursorURLValidator.isAllowedCursorURLString(sourceURL) else {
+        guard CursorURLValidator.isAllowedCursorResponseURLString(sourceURL) else {
             return
         }
 
         switch loadPhase {
         case .usage:
+            if let planLabel = CursorDashboardParser.parsePlanInfoLabel(fromResponseBody: body, sourceURL: sourceURL) {
+                supplementalPlanLabel = planLabel
+            }
+
             switch CursorDashboardParser.parseResponseBody(body, sourceURL: sourceURL) {
             case .usage(let snapshot):
-                beginBillingPhase(with: snapshot)
+                beginBillingPhase(with: enrichedSnapshot(snapshot))
             case .authRequired where mode == .background:
                 resolve(.failure(CursorUsageError.authExpired))
             case .authRequired, .noMatch:
@@ -196,6 +209,13 @@ final class CursorWebViewScraper: NSObject {
 
     private func beginBillingPhase(with snapshot: CursorUsageSnapshot) {
         guard loadPhase == .usage else {
+            return
+        }
+
+        let snapshot = enrichedSnapshot(snapshot)
+
+        if snapshot.resetDisplayValue != nil {
+            resolve(.success(snapshot))
             return
         }
 
@@ -221,6 +241,22 @@ final class CursorWebViewScraper: NSObject {
         return Date().timeIntervalSince(billingPhaseStartedAt) > 12
     }
 
+    private func enrichedSnapshot(_ snapshot: CursorUsageSnapshot) -> CursorUsageSnapshot {
+        guard snapshot.planLabel == "Cursor Plan", let supplementalPlanLabel else {
+            return snapshot
+        }
+
+        return CursorUsageSnapshot(
+            planLabel: supplementalPlanLabel,
+            totalUsedPercent: snapshot.totalUsedPercent,
+            autoUsedPercent: snapshot.autoUsedPercent,
+            apiUsedPercent: snapshot.apiUsedPercent,
+            resetDisplay: snapshot.resetDisplayValue,
+            fetchedAt: snapshot.fetchedAt,
+            connectionState: snapshot.connectionState
+        )
+    }
+
     private func resolve(_ result: Result<CursorUsageSnapshot, Error>) {
         guard !hasResolved else {
             return
@@ -243,6 +279,8 @@ final class CursorWebViewScraper: NSObject {
 
         continuation = nil
         pendingUsageSnapshot = nil
+        deferredDOMSnapshot = nil
+        supplementalPlanLabel = nil
     }
 
     private static let messageHandlerName = "cursorNetworkBridge"
@@ -270,7 +308,7 @@ final class CursorWebViewScraper: NSObject {
       window.__aimeterCursorHookInstalled = true;
 
       const maxLength = 50000;
-      const allowedHosts = new Set(["cursor.com", "www.cursor.com"]);
+      const allowedHosts = new Set(["cursor.com", "www.cursor.com", "api2.cursor.sh"]);
 
       const allowedURL = (value) => {
         try {

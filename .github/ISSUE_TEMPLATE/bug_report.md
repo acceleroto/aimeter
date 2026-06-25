@@ -20,8 +20,18 @@ Describe the problem clearly.
 ## Area
 
 - [ ] Cursor tracking
+- [ ] Claude tracking
+- [ ] OpenAI tracking
 - [ ] Build or packaging
 - [ ] Documentation or other
+
+## Cursor tracking checklist
+
+If this is a Cursor usage bug, please also include:
+
+- [ ] Compared against the signed-in [spending dashboard](https://cursor.com/dashboard/spending)
+- [ ] Tried disconnecting and reconnecting Cursor in AIMeter
+- [ ] Included whether the Included usage block is visible on the spending dashboard
 
 ## Steps to reproduce
 

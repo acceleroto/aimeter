@@ -128,7 +128,7 @@ struct MenuPopoverView: View {
             }
 
             onboardingTile(
-                description: "Track total plan usage, Auto usage, and API usage from your Cursor settings dashboard.",
+                description: "Track total plan usage, Auto usage, and API usage from your Cursor spending dashboard.",
                 buttonTitle: "Connect Cursor",
                 action: onConnectCursor
             )

@@ -11,8 +11,11 @@ Please include:
 - macOS version
 - Xcode version, if the issue is build-related
 - AIMeter version or commit
-- affected area: Cursor tracking, build, packaging, or documentation
+- affected provider: Cursor, Claude, or OpenAI
+- affected area: provider tracking, build, packaging, or documentation
 - clear reproduction steps
+
+For Cursor tracking bugs, also note whether the signed-in [spending dashboard](https://cursor.com/dashboard/spending) shows the Included usage block and what percentages it displays there.
 
 ## Privacy
 

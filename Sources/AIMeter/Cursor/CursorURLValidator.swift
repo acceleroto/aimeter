@@ -6,6 +6,10 @@ enum CursorURLValidator {
         "www.cursor.com"
     ]
 
+    static let allowedResponseHosts: Set<String> = allowedHosts.union([
+        "api2.cursor.sh"
+    ])
+
     static func validatedUsageURL(from rawURL: String) throws -> URL {
         let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed), isAllowedCursorURL(url) else {
@@ -31,7 +35,23 @@ enum CursorURLValidator {
         return isAllowedCursorURL(url)
     }
 
+    static func isAllowedCursorResponseURLString(_ rawURL: String) -> Bool {
+        guard let url = URL(string: rawURL) else {
+            return false
+        }
+
+        return isAllowedCursorResponseURL(url)
+    }
+
     static func isAllowedCursorURL(_ url: URL) -> Bool {
+        isAllowedHTTPSURL(url, hosts: allowedHosts)
+    }
+
+    static func isAllowedCursorResponseURL(_ url: URL) -> Bool {
+        isAllowedHTTPSURL(url, hosts: allowedResponseHosts)
+    }
+
+    private static func isAllowedHTTPSURL(_ url: URL, hosts: Set<String>) -> Bool {
         guard url.scheme?.lowercased() == "https" else {
             return false
         }
@@ -48,6 +68,6 @@ enum CursorURLValidator {
             return false
         }
 
-        return allowedHosts.contains(host)
+        return hosts.contains(host)
     }
 }

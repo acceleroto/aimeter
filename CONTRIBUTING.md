@@ -43,9 +43,16 @@ AIMeter reads usage from an authenticated web session using `WKWebView`. This in
 When working on scraper bugs:
 
 - prefer updating parser fixtures first
-- keep parsing scoped to the known Cursor usage sections
+- keep Cursor parsing scoped to the spending dashboard `get-current-period-usage` response and the Included usage section in DOM text
+- treat `planUsage.totalPercentUsed`, `planUsage.autoPercentUsed`, and `planUsage.apiPercentUsed` as already being on a 0-100 scale; do not run them through fractional percent normalization
 - do not commit cookies, screenshots with personal data, or account details
 - add tests for new Cursor page structures whenever possible
+
+Authoritative Cursor usage sources today:
+
+- page: `https://cursor.com/dashboard/spending`
+- API: `https://cursor.com/api/dashboard/get-current-period-usage`
+- direct Connect host (when intercepted): `https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage`
 
 The settings UI intentionally hides developer-only URL override fields. The underlying override plumbing still exists in:
 

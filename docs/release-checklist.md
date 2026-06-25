@@ -46,7 +46,8 @@ After the script finishes, verify the app opens on a clean macOS account or VM b
 
 - Create a tag such as `v0.1.0`.
 - Attach `dist/AIMeter.dmg`.
-- Include a short note that AIMeter uses unofficial Cursor web-session scraping and may need parser updates when Cursor changes its pages.
+- Include a short note that AIMeter uses unofficial provider web-session scraping and may need parser updates when provider dashboards change.
+- For Cursor releases, mention that usage is read from `cursor.com/dashboard/spending`.
 - Mention tested macOS and Xcode versions.
 - Link to `SECURITY.md` for private vulnerability reporting.
 

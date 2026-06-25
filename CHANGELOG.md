@@ -13,6 +13,14 @@ This project follows semantic versioning while it is practical for a small macOS
 ### Changed
 
 - Menu bar display always keeps at least one of the progress bar or Cursor Auto/API percentages visible; percentages-only mode shows `--/--` when Cursor has not synced yet.
+- Cursor usage now reads from the [spending dashboard](https://cursor.com/dashboard/spending) instead of `cursor.com/settings`.
+- Saved Cursor settings that still pointed at the old settings URL are migrated to the spending dashboard automatically.
+
+### Fixed
+
+- Cursor sync now prefers the dashboard `get-current-period-usage` response instead of unrelated page JSON or DOM text.
+- Cursor API/Auto percentages no longer get mis-scaled when Cursor returns whole-number percent values such as `1.0` for 1%.
+- Cursor DOM parsing is scoped to the Included usage section so on-demand or historical percentages are not mistaken for plan usage.
 
 ## [0.4.0] - 2026-05-07
 
