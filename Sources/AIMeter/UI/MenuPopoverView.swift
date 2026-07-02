@@ -111,9 +111,9 @@ struct MenuPopoverView: View {
         case 1:
             return 370
         case 2:
-            return 560
+            return 620
         default:
-            return 680
+            return 620
         }
     }
 

@@ -186,9 +186,9 @@ final class MenuBarController: NSObject {
             case 1:
                 height = 370
             case 2:
-                height = 560
+                height = 620
             default:
-                height = 680
+                height = 620
             }
         }
 
