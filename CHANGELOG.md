@@ -21,6 +21,8 @@ This project follows semantic versioning while it is practical for a small macOS
 - Cursor sync now prefers the dashboard `get-current-period-usage` response instead of unrelated page JSON or DOM text.
 - Cursor API/Auto percentages no longer get mis-scaled when Cursor returns whole-number percent values such as `1.0` for 1%.
 - Cursor DOM parsing is scoped to the Included usage section so on-demand or historical percentages are not mistaken for plan usage.
+- Cursor background sync now proactively calls the spending-dashboard usage API from the signed-in page context when passive network interception misses it.
+- Cursor sync tolerates total-only usage payloads and surfaces a clearer message when Cursor returns `Usage summary is not enabled`.
 
 ## [0.4.0] - 2026-05-07
 

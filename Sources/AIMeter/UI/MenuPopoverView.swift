@@ -46,6 +46,7 @@ struct MenuPopoverView: View {
             .padding(14)
         }
         .frame(width: 380, height: popoverHeight, alignment: .topLeading)
+        .id(dashboardStore.popoverReferenceDate)
     }
 
     private var header: some View {
@@ -354,7 +355,7 @@ struct MenuPopoverView: View {
 
     private func footer(_ state: DashboardState) -> some View {
         HStack {
-            Text("Last dashboard sync: \(DisplayFormatting.relativeTimestamp(state.lastRefreshAt))")
+            Text("Last dashboard sync: \(DisplayFormatting.lastSyncTimestamp(state.lastRefreshAt))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -395,7 +396,7 @@ struct MenuPopoverView: View {
 
     private func providerFooter(lastSync: Date?, message: String?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Last sync: \(DisplayFormatting.relativeTimestamp(lastSync))")
+            Text("Last sync: \(DisplayFormatting.lastSyncTimestamp(lastSync))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

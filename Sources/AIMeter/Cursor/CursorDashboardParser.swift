@@ -83,6 +83,15 @@ enum CursorDashboardParser {
             || lowercased.contains("getplaninfo")
     }
 
+    static func parseUsageSummaryDisabledMessage(fromResponseBody body: String) -> String? {
+        let normalized = body.lowercased()
+        guard normalized.contains("usage summary is not enabled") else {
+            return nil
+        }
+
+        return "Cursor usage summary is not enabled for this account. Confirm the Included usage block appears on cursor.com/dashboard/spending, then reconnect AIMeter."
+    }
+
     static func parseDOMText(_ text: String, sourceURL: String) -> ParseResult {
         parseText(text, sourceURL: sourceURL, allowAuthDetection: true)
     }
@@ -166,22 +175,19 @@ enum CursorDashboardParser {
         _ object: [String: Any],
         sourceURL: String
     ) -> CursorUsageSnapshot? {
-        guard let planUsage = object["planUsage"] as? [String: Any] else {
+        guard let planUsage = extractPlanUsage(from: object) else {
             return nil
         }
 
         guard let total = planUsagePercent(from: planUsage["totalPercentUsed"])
             ?? computedTotalPercent(from: planUsage)
+            ?? totalPercent(fromDisplayMessage: object["displayMessage"])
         else {
             return nil
         }
 
         let auto = planUsagePercent(from: planUsage["autoPercentUsed"])
         let api = planUsagePercent(from: planUsage["apiPercentUsed"])
-
-        guard auto != nil || api != nil else {
-            return nil
-        }
 
         return makeSnapshot(
             planLabel: resolvedPlanLabel(from: object) ?? "Cursor Plan",
@@ -190,6 +196,33 @@ enum CursorDashboardParser {
             apiUsedPercent: api ?? 0,
             resetDisplay: billingResetDisplay(from: object, sourceURL: sourceURL)
         )
+    }
+
+    private static func extractPlanUsage(from object: [String: Any]) -> [String: Any]? {
+        if let planUsage = object["planUsage"] as? [String: Any] {
+            return planUsage
+        }
+
+        for key in ["data", "result", "usage", "payload"] {
+            if let nested = object[key] as? [String: Any],
+               let planUsage = nested["planUsage"] as? [String: Any]
+            {
+                return planUsage
+            }
+        }
+
+        return nil
+    }
+
+    private static func totalPercent(fromDisplayMessage value: Any?) -> Double? {
+        guard let message = value as? String else {
+            return nil
+        }
+
+        return DashboardParserSupport.firstMatch(
+            in: message,
+            pattern: #"(\d+(?:\.\d+)?)%"#
+        ).flatMap(Double.init)
     }
 
     private static func planUsagePercent(from value: Any?) -> Double? {
@@ -366,12 +399,16 @@ enum CursorDashboardParser {
             let totalPercent = DashboardParserSupport.firstMatch(
                 in: section,
                 pattern: "Total\\s+(\\d+(?:\\.\\d+)?)%"
+            ) ?? DashboardParserSupport.firstMatch(
+                in: section,
+                pattern: "You've used (\\d+(?:\\.\\d+)?)%"
             ),
-            let breakdown = parseUsageBreakdownPercents(in: section),
             let total = Double(totalPercent)
         else {
             return .noMatch
         }
+
+        let breakdown = parseUsageBreakdownPercents(in: section) ?? (auto: 0, api: 0)
 
         let normalizedPlanLabel: String
         if planLabel.lowercased().hasSuffix("plan") {
@@ -401,11 +438,21 @@ enum CursorDashboardParser {
     }
 
     private static func includedUsageSection(from text: String) -> String? {
-        guard let range = text.range(of: "Included", options: .caseInsensitive) else {
+        let lowered = text.lowercased()
+        let markers = [
+            "included in",
+            "included usage",
+            "plan usage",
+            "usage summary"
+        ]
+
+        let ranges = markers.compactMap { lowered.range(of: $0) }
+        guard let marker = ranges.min(by: { $0.lowerBound < $1.lowerBound }) else {
             return nil
         }
 
-        return String(text[range.lowerBound...].prefix(800))
+        let start = text.index(text.startIndex, offsetBy: lowered.distance(from: lowered.startIndex, to: marker.lowerBound))
+        return String(text[start...].prefix(800))
     }
 
     private static func parseUsageBreakdownPercents(in section: String) -> (auto: Double, api: Double)? {

@@ -51,6 +51,14 @@ enum CursorURLValidator {
         isAllowedHTTPSURL(url, hosts: allowedResponseHosts)
     }
 
+    static func isSpendingDashboardURLString(_ rawURL: String) -> Bool {
+        guard let path = URL(string: rawURL)?.path.lowercased() else {
+            return false
+        }
+
+        return path.contains("/dashboard/spending")
+    }
+
     private static func isAllowedHTTPSURL(_ url: URL, hosts: Set<String>) -> Bool {
         guard url.scheme?.lowercased() == "https" else {
             return false

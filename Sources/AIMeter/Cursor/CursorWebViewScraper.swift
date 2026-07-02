@@ -28,6 +28,8 @@ final class CursorWebViewScraper: NSObject {
     private var pendingUsageSnapshot: CursorUsageSnapshot?
     private var deferredDOMSnapshot: CursorUsageSnapshot?
     private var supplementalPlanLabel: String?
+    private var lastUsageAPIError: String?
+    private var hasRequestedProactiveUsageFetch = false
     private var billingPhaseStartedAt: Date?
 
     private static let billingPageURL = URL(string: CursorDashboardParser.billingPageURL)!
@@ -35,7 +37,7 @@ final class CursorWebViewScraper: NSObject {
     init(mode: Mode, usagePageURL: URL, dataStore: WKWebsiteDataStore) {
         self.mode = mode
         self.usagePageURL = usagePageURL
-        self.timeoutSeconds = mode == .interactive ? 180 : 35
+        self.timeoutSeconds = mode == .interactive ? 180 : 60
 
         let contentController = WKUserContentController()
         self.contentController = contentController
@@ -72,6 +74,8 @@ final class CursorWebViewScraper: NSObject {
             pendingUsageSnapshot = nil
             deferredDOMSnapshot = nil
             supplementalPlanLabel = nil
+            lastUsageAPIError = nil
+            hasRequestedProactiveUsageFetch = false
             billingPhaseStartedAt = nil
             let request = URLRequest(url: usagePageURL)
             webView.load(request)
@@ -96,6 +100,11 @@ final class CursorWebViewScraper: NSObject {
 
                 if let deferredDOMSnapshot = self.deferredDOMSnapshot, self.loadPhase == .usage {
                     self.beginBillingPhase(with: deferredDOMSnapshot)
+                    return
+                }
+
+                if let lastUsageAPIError = self.lastUsageAPIError, self.loadPhase == .usage {
+                    self.resolve(.failure(CursorUsageError.syncFailed(lastUsageAPIError)))
                     return
                 }
 
@@ -153,6 +162,8 @@ final class CursorWebViewScraper: NSObject {
             let text = result["text"] as? String ?? ""
             let url = result["url"] as? String ?? webView.url?.absoluteString ?? usagePageURL.absoluteString
 
+            await requestProactiveUsageFetchIfNeeded(currentURL: url)
+
             switch loadPhase {
             case .usage:
                 switch CursorDashboardParser.parseDOMText(text, sourceURL: url) {
@@ -184,6 +195,10 @@ final class CursorWebViewScraper: NSObject {
         let sourceURL = payload["url"] as? String ?? webView.url?.absoluteString ?? usagePageURL.absoluteString
         guard CursorURLValidator.isAllowedCursorResponseURLString(sourceURL) else {
             return
+        }
+
+        if let disabledMessage = CursorDashboardParser.parseUsageSummaryDisabledMessage(fromResponseBody: body) {
+            lastUsageAPIError = disabledMessage
         }
 
         switch loadPhase {
@@ -241,6 +256,75 @@ final class CursorWebViewScraper: NSObject {
         return Date().timeIntervalSince(billingPhaseStartedAt) > 12
     }
 
+    private func requestProactiveUsageFetchIfNeeded(currentURL: String) async {
+        guard !hasRequestedProactiveUsageFetch else {
+            return
+        }
+
+        guard loadPhase == .usage, !hasResolved else {
+            return
+        }
+
+        guard CursorURLValidator.isSpendingDashboardURLString(currentURL)
+            || CursorURLValidator.isSpendingDashboardURLString(usagePageURL.absoluteString)
+        else {
+            return
+        }
+
+        hasRequestedProactiveUsageFetch = true
+
+        let script = """
+        (async () => {
+          const endpoints = [
+            "/api/dashboard/get-current-period-usage",
+            "/api/dashboard/get-plan-info"
+          ];
+
+          const fetchEndpoint = async (endpoint) => {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Connect-Protocol-Version": "1"
+              },
+              body: "{}",
+              credentials: "include"
+            });
+            const body = await response.text();
+            return {
+              url: response.url || new URL(endpoint, window.location.href).toString(),
+              status: response.status,
+              body
+            };
+          };
+
+          const results = [];
+          for (const endpoint of endpoints) {
+            try {
+              results.push(await fetchEndpoint(endpoint));
+            } catch (_) {}
+          }
+
+          return results;
+        })()
+        """
+
+        do {
+            guard let results = try await webView.evaluateJavaScript(script) as? [[String: Any]] else {
+                return
+            }
+
+            for result in results {
+                handleNetworkMessage([
+                    "url": result["url"] as? String ?? usagePageURL.absoluteString,
+                    "body": result["body"] as? String ?? ""
+                ])
+            }
+        } catch {
+            return
+        }
+    }
+
     private func enrichedSnapshot(_ snapshot: CursorUsageSnapshot) -> CursorUsageSnapshot {
         guard snapshot.planLabel == "Cursor Plan", let supplementalPlanLabel else {
             return snapshot
@@ -281,6 +365,8 @@ final class CursorWebViewScraper: NSObject {
         pendingUsageSnapshot = nil
         deferredDOMSnapshot = nil
         supplementalPlanLabel = nil
+        lastUsageAPIError = nil
+        hasRequestedProactiveUsageFetch = false
     }
 
     private static let messageHandlerName = "cursorNetworkBridge"
@@ -381,6 +467,11 @@ final class CursorWebViewScraper: NSObject {
 extension CursorWebViewScraper: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         startPollingDOM()
+
+        Task { @MainActor in
+            let currentURL = webView.url?.absoluteString ?? usagePageURL.absoluteString
+            await requestProactiveUsageFetchIfNeeded(currentURL: currentURL)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

@@ -4,6 +4,7 @@ import Combine
 @MainActor
 final class DashboardStore: ObservableObject {
     @Published private(set) var state: DashboardState = .initial
+    @Published private(set) var popoverReferenceDate = Date()
 
     private var cancellables: Set<AnyCancellable> = []
     private let settingsStore: SettingsStore
@@ -40,6 +41,10 @@ final class DashboardStore: ObservableObject {
         }
 
         publishState()
+    }
+
+    func markPopoverOpened() {
+        popoverReferenceDate = Date()
     }
 
     private func publishState() {

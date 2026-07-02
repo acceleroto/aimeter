@@ -39,6 +39,27 @@ final class DashboardStoreTests: XCTestCase {
         XCTAssertTrue(settingsStore.settings.hasCompletedInitialSetup)
     }
 
+    func testMarkPopoverOpenedUpdatesReferenceDate() {
+        let userDefaults = UserDefaults(suiteName: #function)!
+        userDefaults.removePersistentDomain(forName: #function)
+
+        let settingsStore = SettingsStore(userDefaults: userDefaults)
+        let cursorCoordinator = CursorUsageCoordinator(
+            settingsStore: settingsStore,
+            client: DashboardMockCursorUsageClient(fetchResults: [])
+        )
+        let dashboardStore = DashboardStore(
+            settingsStore: settingsStore,
+            cursorUsageCoordinator: cursorCoordinator
+        )
+
+        let initialReference = dashboardStore.popoverReferenceDate
+        Thread.sleep(forTimeInterval: 0.01)
+        dashboardStore.markPopoverOpened()
+
+        XCTAssertGreaterThan(dashboardStore.popoverReferenceDate, initialReference)
+    }
+
     func testDashboardStateStartsInFirstRunMode() {
         let userDefaults = UserDefaults(suiteName: #function)!
         userDefaults.removePersistentDomain(forName: #function)

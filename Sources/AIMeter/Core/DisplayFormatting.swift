@@ -172,13 +172,28 @@ enum DisplayFormatting {
         return nil
     }
 
-    static func relativeTimestamp(_ date: Date?) -> String {
+    static func relativeTimestamp(_ date: Date?, relativeTo referenceDate: Date = Date()) -> String {
         guard let date else {
             return "Never"
         }
 
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: Date())
+        let comparisonDate = min(date, referenceDate)
+        return formatter.localizedString(for: comparisonDate, relativeTo: referenceDate)
+    }
+
+    static func lastSyncTimestamp(_ date: Date?, relativeTo referenceDate: Date = Date()) -> String {
+        guard let date else {
+            return "Never"
+        }
+
+        if date.timeIntervalSince(referenceDate) > 1 {
+            return "Just now"
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: referenceDate)
     }
 }

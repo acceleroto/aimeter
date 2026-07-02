@@ -39,4 +39,23 @@ final class DisplayFormattingTests: XCTestCase {
         let reset = Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 8))!
         XCTAssertEqual(DisplayFormatting.resetInDays(until: reset, from: reference), "Resets in 12 days")
     }
+
+    func testLastSyncTimestampNeverUsesFutureTense() {
+        let reference = Date(timeIntervalSince1970: 1_000)
+        let slightlyFuture = Date(timeIntervalSince1970: 1_002)
+
+        XCTAssertEqual(
+            DisplayFormatting.lastSyncTimestamp(slightlyFuture, relativeTo: reference),
+            "Just now"
+        )
+    }
+
+    func testRelativeTimestampUsesProvidedReferenceDate() {
+        let fetchedAt = Date(timeIntervalSince1970: 0)
+        let reference = Date(timeIntervalSince1970: 600)
+
+        let formatted = DisplayFormatting.relativeTimestamp(fetchedAt, relativeTo: reference)
+
+        XCTAssertTrue(formatted.contains("10"))
+    }
 }

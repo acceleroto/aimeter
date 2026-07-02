@@ -361,6 +361,94 @@ final class CursorDashboardParserTests: XCTestCase {
         XCTAssertEqual(result, .noMatch)
     }
 
+    func testParsesTotalOnlyPlanUsagePayload() {
+        let payload = """
+        {
+          "displayMessage": "You've used 15% of your usage limit",
+          "planUsage": {
+            "totalPercentUsed": 15
+          }
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://cursor.com/api/dashboard/get-current-period-usage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.totalUsedPercent, 15, accuracy: 0.01)
+        XCTAssertEqual(snapshot.autoUsedPercent, 0, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 0, accuracy: 0.01)
+    }
+
+    func testParsesNestedPlanUsagePayload() {
+        let payload = """
+        {
+          "data": {
+            "planUsage": {
+              "totalPercentUsed": 12,
+              "autoPercentUsed": 3,
+              "apiPercentUsed": 1
+            }
+          }
+        }
+        """
+
+        let result = CursorDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://cursor.com/api/dashboard/get-current-period-usage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.apiUsedPercent, 1, accuracy: 0.01)
+    }
+
+    func testDetectsUsageSummaryDisabledMessage() {
+        let payload = """
+        {
+          "error": {
+            "details": [
+              {
+                "details": {
+                  "detail": "Usage summary is not enabled"
+                }
+              }
+            ]
+          }
+        }
+        """
+
+        XCTAssertNotNil(CursorDashboardParser.parseUsageSummaryDisabledMessage(fromResponseBody: payload))
+    }
+
+    func testParsesPlanUsageSectionDOMText() {
+        let text = """
+        Plan usage
+        Pro+ plan
+        Total
+        13%
+        58% Auto + Composer and 1% API used
+        """
+
+        let result = CursorDashboardParser.parseDOMText(
+            text,
+            sourceURL: "https://cursor.com/dashboard/spending"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.apiUsedPercent, 1, accuracy: 0.01)
+    }
+
     func testParsesDOMTextFixture() {
         let text = """
         Included in Pro+
@@ -410,16 +498,22 @@ final class CursorDashboardParserTests: XCTestCase {
         XCTAssertEqual(snapshot.apiUsedPercent, 48, accuracy: 0.01)
     }
 
-    func testRejectsPartialDashboardData() {
+    func testParsesTotalOnlyDOMTextWhenBreakdownIsMissing() {
         let text = """
         Included in Pro+
         Total
         13%
         """
 
-        let result = CursorDashboardParser.parseDOMText(text, sourceURL: "https://www.cursor.com/settings")
+        let result = CursorDashboardParser.parseDOMText(text, sourceURL: "https://cursor.com/dashboard/spending")
 
-        XCTAssertEqual(result, .noMatch)
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.totalUsedPercent, 13, accuracy: 0.01)
+        XCTAssertEqual(snapshot.autoUsedPercent, 0, accuracy: 0.01)
+        XCTAssertEqual(snapshot.apiUsedPercent, 0, accuracy: 0.01)
     }
 
     func testDetectsAuthenticationPage() {

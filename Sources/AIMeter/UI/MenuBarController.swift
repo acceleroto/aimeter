@@ -304,6 +304,7 @@ final class MenuBarController: NSObject {
         if popover.isShown {
             closePopover(sender)
         } else {
+            dashboardStore.markPopoverOpened()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.becomeKey()
             installEventMonitors()

@@ -18,6 +18,14 @@ final class CursorURLValidatorTests: XCTestCase {
         XCTAssertEqual(rootURL.host, "cursor.com")
     }
 
+    func testAcceptsSpendingDashboardURL() throws {
+        let spendingURL = try CursorURLValidator.validatedUsageURL(
+            from: "https://cursor.com/dashboard/spending"
+        )
+
+        XCTAssertTrue(CursorURLValidator.isSpendingDashboardURLString(spendingURL.absoluteString))
+    }
+
     func testAcceptsCursorAPIResponseHost() {
         XCTAssertTrue(
             CursorURLValidator.isAllowedCursorResponseURLString(
