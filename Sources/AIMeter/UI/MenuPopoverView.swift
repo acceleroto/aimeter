@@ -143,7 +143,7 @@ struct MenuPopoverView: View {
 
             onboardingTile(
                 provider: .openai,
-                description: "Track ChatGPT Plus Codex usage from the analytics page: 5-hour limit, weekly limit, and credits.",
+                description: "Track ChatGPT Plus Codex usage from the analytics page: weekly limit and credits.",
                 buttonTitle: "Connect OpenAI",
                 action: onConnectOpenAI
             )
@@ -273,15 +273,7 @@ struct MenuPopoverView: View {
                 metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
             }
         case .openai:
-            let fiveHourCard: UsageMetric? = {
-                if snapshot.primaryMetric.percent != nil,
-                   snapshot.primaryMetric.title.caseInsensitiveCompare("5-hour") == .orderedSame {
-                    return snapshot.primaryMetric
-                }
-                return metrics.first { $0.title.caseInsensitiveCompare("5-hour") == .orderedSame }
-            }()
-            let weekly = metrics.first { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }
-            return [fiveHourCard, weekly].compactMap { $0 }
+            return metrics.filter { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }
         case .cursor:
             return metrics.removingDuplicateTitles()
         }
@@ -296,7 +288,7 @@ struct MenuPopoverView: View {
                 metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
             }
         case .openai:
-            let titles = ["5-hour reset", "Weekly reset"]
+            let titles = ["Weekly reset"]
             return titles.compactMap { title in
                 metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
             }

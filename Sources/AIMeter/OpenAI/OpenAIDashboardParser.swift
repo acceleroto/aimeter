@@ -119,9 +119,9 @@ enum OpenAIDashboardParser {
 
         let planLabel = planLabel(from: lines, text: text)
         let usageMetrics = usageMetrics(from: lines, sourceURL: sourceURL)
-        let fiveHourMetric = usageMetrics.first { $0.title.caseInsensitiveCompare("5-hour") == .orderedSame }
-        let primaryMetric = fiveHourMetric
-            ?? usageMetrics.first
+        let weeklyMetric = usageMetrics.first { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }
+        let primaryMetric = weeklyMetric
+            ?? usageMetrics.first { $0.percent != nil }
             ?? primaryMetricFromText(text)
         let usagePercent = primaryMetric?.percent
 
@@ -129,21 +129,22 @@ enum OpenAIDashboardParser {
             return .noMatch
         }
 
-        if requireUsagePercent && usagePercent == nil && fiveHourMetric == nil {
+        if requireUsagePercent && usagePercent == nil && weeklyMetric == nil {
             return .noMatch
         }
 
         let resolvedPrimary: UsageMetric
         if let primaryMetric {
-            resolvedPrimary = primaryMetric
+            resolvedPrimary = canonicalPrimaryMetric(primaryMetric)
         } else if let reported = reportedRemainingPercent(from: text) {
-            resolvedPrimary = usageMetric(title: "5-hour", reportedRemainingPercent: reported)
+            resolvedPrimary = usageMetric(title: "Weekly", reportedRemainingPercent: reported)
         } else {
-            resolvedPrimary = UsageMetric(title: "5-hour", value: "Available")
+            resolvedPrimary = UsageMetric(title: "Weekly", value: "Available")
         }
 
         let secondaryMetrics = usageMetrics
             .filter { $0.title.caseInsensitiveCompare(resolvedPrimary.title) != .orderedSame }
+            .filter { !isObsoleteFiveHourMetric($0) }
             .removingDuplicateMetrics()
 
         return .usage(
@@ -159,6 +160,10 @@ enum OpenAIDashboardParser {
     }
 
     private static func primaryMetricFromText(_ text: String) -> UsageMetric? {
+        if let reported = reportedRemainingPercent(from: text, near: "weekly") {
+            return usageMetric(title: "Weekly", reportedRemainingPercent: reported)
+        }
+
         guard
             let reported = reportedRemainingPercent(from: text, near: "5-hour")
                 ?? reportedRemainingPercent(from: text, near: "5 hour")
@@ -166,7 +171,20 @@ enum OpenAIDashboardParser {
             return nil
         }
 
-        return usageMetric(title: "5-hour", reportedRemainingPercent: reported)
+        return usageMetric(title: "Weekly", reportedRemainingPercent: reported)
+    }
+
+    private static func isObsoleteFiveHourMetric(_ metric: UsageMetric) -> Bool {
+        let title = metric.title.lowercased()
+        return title == "5-hour" || title == "5-hour reset"
+    }
+
+    private static func canonicalPrimaryMetric(_ metric: UsageMetric) -> UsageMetric {
+        guard isObsoleteFiveHourMetric(metric) else {
+            return metric
+        }
+
+        return UsageMetric(title: "Weekly", value: metric.value, percent: metric.percent)
     }
 
     private static func usageMetrics(from lines: [String], sourceURL: String) -> [UsageMetric] {
@@ -456,22 +474,17 @@ enum OpenAIDashboardParser {
 
     private static func snapshotFromJSONObject(_ object: Any) -> ProviderUsageSnapshot? {
         let leaves = DashboardParserSupport.numericLeaves(from: object)
-        let fiveHourPercent = percentFromJSONLeaves(leaves, keywords: ["five", "hour"])
         let weeklyPercent = percentFromJSONLeaves(leaves, keywords: ["week"])
+        let fiveHourPercent = percentFromJSONLeaves(leaves, keywords: ["five", "hour"])
         let leafText = DashboardParserSupport.jsonLeafStrings(from: object).joined(separator: "\n")
         let planLabel = planLabel(from: DashboardParserSupport.normalizedLines(from: leafText), text: leafText)
 
-        guard fiveHourPercent != nil || weeklyPercent != nil else {
+        guard weeklyPercent != nil || fiveHourPercent != nil else {
             return nil
         }
 
-        let primaryReported = fiveHourPercent ?? weeklyPercent!
-        let primaryTitle = fiveHourPercent != nil ? "5-hour" : "Weekly"
+        let primaryReported = weeklyPercent ?? fiveHourPercent!
         var secondaryMetrics: [UsageMetric] = []
-
-        if let weeklyPercent, fiveHourPercent != nil {
-            secondaryMetrics.append(usageMetric(title: "Weekly", reportedRemainingPercent: weeklyPercent))
-        }
 
         if leafText.localizedCaseInsensitiveContains("credit") {
             if let creditValue = DashboardParserSupport.firstMatch(
@@ -485,7 +498,7 @@ enum OpenAIDashboardParser {
         return ProviderUsageSnapshot(
             provider: .openai,
             planLabel: planLabel,
-            primaryMetric: usageMetric(title: primaryTitle, reportedRemainingPercent: primaryReported),
+            primaryMetric: usageMetric(title: "Weekly", reportedRemainingPercent: primaryReported),
             secondaryMetrics: secondaryMetrics,
             fetchedAt: Date(),
             connectionState: .connected
@@ -536,49 +549,39 @@ private extension Array where Element == UsageMetric {
 
     func normalizedAnalyticsMetrics() -> [UsageMetric] {
         var result: [UsageMetric] = []
-        var hasFiveHour = false
         var hasWeekly = false
 
         for metric in self {
             switch metric.title.lowercased() {
-            case "5-hour", "usage":
-                if !hasFiveHour, metric.percent != nil {
+            case "weekly", "usage":
+                if !hasWeekly, metric.percent != nil {
                     result.append(
                         UsageMetric(
-                            title: "5-hour",
+                            title: "Weekly",
                             value: metric.value,
                             percent: metric.percent
                         )
                     )
-                    hasFiveHour = true
+                    hasWeekly = true
+                } else if metric.title.caseInsensitiveCompare("Weekly") == .orderedSame {
+                    hasWeekly = true
+                    result.append(metric)
                 } else {
                     result.append(metric)
                 }
-            case "weekly":
-                hasWeekly = true
-                result.append(metric)
             default:
                 result.append(metric)
             }
         }
 
         let percentMetrics = filter { $0.percent != nil }
-        if !hasFiveHour,
+        if !hasWeekly,
            let first = percentMetrics.first,
            first.title.caseInsensitiveCompare("Usage") == .orderedSame
         {
             result.insert(
-                UsageMetric(title: "5-hour", value: first.value, percent: first.percent),
+                UsageMetric(title: "Weekly", value: first.value, percent: first.percent),
                 at: 0
-            )
-        }
-        if !hasWeekly,
-           percentMetrics.count > 1,
-           let second = percentMetrics.dropFirst().first,
-           second.title.caseInsensitiveCompare("Usage") == .orderedSame
-        {
-            result.append(
-                UsageMetric(title: "Weekly", value: second.value, percent: second.percent)
             )
         }
 

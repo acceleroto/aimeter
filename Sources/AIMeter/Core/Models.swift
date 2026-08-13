@@ -234,7 +234,7 @@ struct ProviderUsageSnapshot: Equatable {
     static let openaiDisconnected = ProviderUsageSnapshot(
         provider: .openai,
         planLabel: "OpenAI",
-        primaryMetric: UsageMetric(title: "5-hour", value: "Not connected"),
+        primaryMetric: UsageMetric(title: "Weekly", value: "Not connected"),
         secondaryMetrics: [],
         fetchedAt: nil,
         connectionState: .disconnected
@@ -304,8 +304,16 @@ struct ProviderUsageSnapshot: Equatable {
         metricPercent(named: "API")
     }
 
+    var weeklyPercent: Double? {
+        if primaryMetric.title.caseInsensitiveCompare("Weekly") == .orderedSame {
+            return primaryMetric.percent
+        }
+
+        return secondaryMetrics.first { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }?.percent
+    }
+
     var weeklyUsedPercent: Double {
-        metricPercent(named: "Weekly")
+        weeklyPercent ?? 0
     }
 
     func withConnectionState(_ state: ProviderConnectionState) -> ProviderUsageSnapshot {

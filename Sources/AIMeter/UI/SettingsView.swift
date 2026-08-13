@@ -51,7 +51,7 @@ struct SettingsView: View {
                 coordinator: openAIUsageCoordinator,
                 localSessionDescription: "AIMeter reads ChatGPT Codex analytics from a local web session. No API key is required.",
                 showMenuBarPercentagesToggle: true,
-                menuBarPercentagesToggleTitle: "Show OpenAI 5-hour & Weekly percentages in Menu Bar"
+                menuBarPercentagesToggleTitle: "Show OpenAI Weekly percentage in Menu Bar"
             )
 
             Section("Polling") {

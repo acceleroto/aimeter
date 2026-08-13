@@ -221,9 +221,9 @@ final class MenuBarController: NSObject {
 
         if settings.menuBar.showOpenAICodexPercentages {
             let openAI = state.openaiSnapshot
-            if openAI.connectionState != .disconnected, openAI.hasSuccessfulSync, let fiveHour = openAI.progressPercent {
+            if openAI.connectionState != .disconnected, openAI.hasSuccessfulSync, let weekly = openAI.weeklyPercent {
                 lines.append(
-                    "OpenAI 5-hour: \(DisplayFormatting.percent(fiveHour)), Weekly: \(DisplayFormatting.percent(openAI.weeklyUsedPercent))"
+                    "OpenAI Weekly: \(DisplayFormatting.percent(weekly))"
                 )
             }
         }

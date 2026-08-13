@@ -19,6 +19,7 @@ struct MenuBarDisplay: Equatable {
 
 enum MenuBarDisplayResolver {
     static let placeholderSuffix = "--/--"
+    static let openAIPlaceholderSuffix = "--"
     static let segmentSeparator = " | "
 
     static func resolve(
@@ -76,7 +77,7 @@ enum MenuBarDisplayResolver {
             return suffix
         }
 
-        return showPlaceholderWhenEmpty ? placeholderSuffix : ""
+        return showPlaceholderWhenEmpty ? openAIPlaceholderSuffix : ""
     }
 
     private static func cursorAutoAPISuffix(from snapshot: ProviderUsageSnapshot) -> String? {
@@ -95,14 +96,11 @@ enum MenuBarDisplayResolver {
             snapshot.provider == .openai,
             snapshot.connectionState != .disconnected,
             snapshot.hasSuccessfulSync,
-            let fiveHour = snapshot.progressPercent
+            let weekly = snapshot.weeklyPercent
         else {
             return nil
         }
 
-        return DisplayFormatting.menuBarOpenAICodexSuffix(
-            fiveHour: fiveHour,
-            weekly: snapshot.weeklyUsedPercent
-        )
+        return DisplayFormatting.menuBarOpenAICodexSuffix(weekly: weekly)
     }
 }

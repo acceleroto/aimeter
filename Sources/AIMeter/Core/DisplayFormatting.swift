@@ -19,8 +19,8 @@ enum DisplayFormatting {
         "\(compactPercent(auto))/\(compactPercent(api))"
     }
 
-    static func openAICodexSuffix(fiveHour: Double, weekly: Double) -> String {
-        "\(compactPercent(fiveHour))/\(compactPercent(weekly))"
+    static func openAICodexSuffix(weekly: Double) -> String {
+        compactPercent(weekly)
     }
 
     static func menuBarPercent(_ value: Double) -> String {
@@ -32,8 +32,8 @@ enum DisplayFormatting {
         "\(menuBarPercent(auto))/\(menuBarPercent(api))"
     }
 
-    static func menuBarOpenAICodexSuffix(fiveHour: Double, weekly: Double) -> String {
-        "\(menuBarPercent(fiveHour))/\(menuBarPercent(weekly))"
+    static func menuBarOpenAICodexSuffix(weekly: Double) -> String {
+        menuBarPercent(weekly)
     }
 
     static func resetInDays(until resetDate: Date, from referenceDate: Date = Date()) -> String {

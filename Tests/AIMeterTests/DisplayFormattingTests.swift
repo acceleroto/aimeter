@@ -15,6 +15,7 @@ final class DisplayFormattingTests: XCTestCase {
     func testCursorAutoAPISuffixJoinsCompactPercents() {
         XCTAssertEqual(DisplayFormatting.cursorAutoAPISuffix(auto: 5.6, api: 7.8), "5.6%/7.8%")
         XCTAssertEqual(DisplayFormatting.cursorAutoAPISuffix(auto: 6, api: 8), "6%/8%")
+        XCTAssertEqual(DisplayFormatting.openAICodexSuffix(weekly: 14.6), "14.6%")
     }
 
     func testMenuBarPercentRoundsToNearestWholeNumber() {
@@ -25,7 +26,8 @@ final class DisplayFormattingTests: XCTestCase {
 
     func testMenuBarSuffixesUseRoundedPercents() {
         XCTAssertEqual(DisplayFormatting.menuBarCursorAutoAPISuffix(auto: 5.6, api: 7.8), "6%/8%")
-        XCTAssertEqual(DisplayFormatting.menuBarOpenAICodexSuffix(fiveHour: 2.4, weekly: 0.4), "2%/0%")
+        XCTAssertEqual(DisplayFormatting.menuBarOpenAICodexSuffix(weekly: 0.4), "0%")
+        XCTAssertEqual(DisplayFormatting.menuBarOpenAICodexSuffix(weekly: 14.6), "15%")
     }
 
     func testResetDisplayNormalizesRelativeBillingCopy() {

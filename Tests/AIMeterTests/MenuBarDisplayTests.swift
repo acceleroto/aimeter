@@ -34,6 +34,21 @@ final class MenuBarDisplayTests: XCTestCase {
         XCTAssertEqual(display.titleText, MenuBarDisplayResolver.placeholderSuffix)
     }
 
+    func testBarOffWithoutOpenAISyncShowsWeeklyPlaceholder() {
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: false,
+                showOpenAICodexPercentages: true
+            ),
+            cursorSnapshot: .cursorDisconnected,
+            openAISnapshot: .openaiDisconnected
+        )
+
+        XCTAssertFalse(display.showProgressBarImage)
+        XCTAssertEqual(display.titleText, MenuBarDisplayResolver.openAIPlaceholderSuffix)
+    }
+
     func testBarOnWithoutPercentagesShowsImageOnly() {
         let display = MenuBarDisplayResolver.resolve(
             menuBar: .default,
@@ -49,9 +64,32 @@ final class MenuBarDisplayTests: XCTestCase {
         let openAI = ProviderUsageSnapshot(
             provider: .openai,
             planLabel: "ChatGPT Plus",
+            primaryMetric: UsageMetric(title: "Weekly", value: "15%", percent: 15),
+            secondaryMetrics: [],
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: false,
+                showOpenAICodexPercentages: true
+            ),
+            cursorSnapshot: .cursorDisconnected,
+            openAISnapshot: openAI
+        )
+
+        XCTAssertEqual(display.titleText, "15%")
+    }
+
+    func testUsesWeeklyPercentWhenLegacyFiveHourIsPrimary() {
+        let openAI = ProviderUsageSnapshot(
+            provider: .openai,
+            planLabel: "ChatGPT Plus",
             primaryMetric: UsageMetric(title: "5-hour", value: "3%", percent: 3),
             secondaryMetrics: [
-                UsageMetric(title: "Weekly", value: "0%", percent: 0)
+                UsageMetric(title: "Weekly", value: "15%", percent: 15)
             ],
             fetchedAt: Date(),
             connectionState: .connected
@@ -67,7 +105,7 @@ final class MenuBarDisplayTests: XCTestCase {
             openAISnapshot: openAI
         )
 
-        XCTAssertEqual(display.titleText, "3%/0%")
+        XCTAssertEqual(display.titleText, "15%")
     }
 
     func testShowsCursorThenOpenAISegmentsSeparatedByPipe() {
@@ -82,10 +120,8 @@ final class MenuBarDisplayTests: XCTestCase {
         let openAI = ProviderUsageSnapshot(
             provider: .openai,
             planLabel: "ChatGPT Plus",
-            primaryMetric: UsageMetric(title: "5-hour", value: "3%", percent: 3),
-            secondaryMetrics: [
-                UsageMetric(title: "Weekly", value: "0%", percent: 0)
-            ],
+            primaryMetric: UsageMetric(title: "Weekly", value: "15%", percent: 15),
+            secondaryMetrics: [],
             fetchedAt: Date(),
             connectionState: .connected
         )
@@ -100,7 +136,7 @@ final class MenuBarDisplayTests: XCTestCase {
             openAISnapshot: openAI
         )
 
-        XCTAssertEqual(display.titleText, "9%/48% | 3%/0%")
+        XCTAssertEqual(display.titleText, "9%/48% | 15%")
     }
 
     func testNormalizedEnablesProgressBarWhenAllFlagsFalse() {

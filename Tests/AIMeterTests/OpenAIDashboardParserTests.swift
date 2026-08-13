@@ -26,11 +26,11 @@ final class OpenAIDashboardParserTests: XCTestCase {
 
         XCTAssertEqual(snapshot.provider, .openai)
         XCTAssertEqual(snapshot.planLabel, "ChatGPT Plus")
-        XCTAssertEqual(snapshot.primaryMetric.title, "5-hour")
-        XCTAssertEqual(snapshot.progressPercent ?? -1, 42, accuracy: 0.01)
-        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Weekly" }?.percent, 15)
+        XCTAssertEqual(snapshot.primaryMetric.title, "Weekly")
+        XCTAssertEqual(snapshot.progressPercent ?? -1, 15, accuracy: 0.01)
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour" })
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour reset" })
         XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Credits" }?.value, "$5.00")
-        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "5-hour reset" }?.value, "Resets in 2 hours")
         XCTAssertEqual(
             snapshot.secondaryMetrics.first { $0.title == "Weekly reset" }?.value,
             "Resets Sunday 11:30 AM"
@@ -56,6 +56,26 @@ final class OpenAIDashboardParserTests: XCTestCase {
         XCTAssertEqual(snapshot.progressPercent ?? -1, 68, accuracy: 0.01)
     }
 
+    func testTreatsLeftoverFiveHourLimitAsWeekly() {
+        let text = """
+        ChatGPT Plus
+        5-hour usage limit
+        58% remaining
+        Resets in 2 hours
+        """
+
+        let result = OpenAIDashboardParser.parseDOMText(text, sourceURL: analyticsURL)
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected parsed OpenAI usage snapshot.")
+        }
+
+        XCTAssertEqual(snapshot.primaryMetric.title, "Weekly")
+        XCTAssertEqual(snapshot.progressPercent ?? -1, 42, accuracy: 0.01)
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour" })
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour reset" })
+    }
+
     func testConvertsBarePercentLinesAsRemainingCapacity() {
         let text = """
         ChatGPT Plus
@@ -71,8 +91,9 @@ final class OpenAIDashboardParserTests: XCTestCase {
             return XCTFail("Expected parsed OpenAI usage snapshot.")
         }
 
-        XCTAssertEqual(snapshot.progressPercent ?? -1, 20, accuracy: 0.01)
-        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Weekly" }?.percent, 10)
+        XCTAssertEqual(snapshot.progressPercent ?? -1, 10, accuracy: 0.01)
+        XCTAssertEqual(snapshot.primaryMetric.title, "Weekly")
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour" })
     }
 
     func testDetectsAuthPage() {
@@ -104,8 +125,9 @@ final class OpenAIDashboardParserTests: XCTestCase {
         }
 
         XCTAssertEqual(snapshot.planLabel, "ChatGPT Plus")
-        XCTAssertEqual(snapshot.progressPercent ?? -1, 55, accuracy: 0.01)
-        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Weekly" }?.percent, 20)
+        XCTAssertEqual(snapshot.primaryMetric.title, "Weekly")
+        XCTAssertEqual(snapshot.progressPercent ?? -1, 20, accuracy: 0.01)
+        XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour" })
     }
 
     func testRejectsNonOpenAIHost() {
