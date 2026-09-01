@@ -10,14 +10,18 @@ protocol CursorSessionManaging {
 
 @MainActor
 final class CursorSessionManager: CursorSessionManaging {
+    private static let dataStoreIdentifier = UUID(uuidString: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890")!
+
     private let dataStore: WKWebsiteDataStore
     private var connectionWindowController: UsageConnectionWindowController?
     private var activeScraper: CursorWebViewScraper?
+    private var websiteDataCleanupTask: Task<Void, Never>?
 
     private(set) var isConnected = false
 
     init() {
-        self.dataStore = WKWebsiteDataStore.default()
+        CursorWebsiteDataSupport.migrateLegacyDefaultStoreIfNeeded()
+        self.dataStore = WKWebsiteDataStore(forIdentifier: Self.dataStoreIdentifier)
     }
 
     init(dataStore: WKWebsiteDataStore) {
@@ -25,6 +29,8 @@ final class CursorSessionManager: CursorSessionManaging {
     }
 
     func connect(to usagePageURL: URL) async throws -> CursorUsageSnapshot {
+        await waitForWebsiteDataCleanup()
+
         let scraper = CursorWebViewScraper(mode: .interactive, usagePageURL: usagePageURL, dataStore: dataStore)
         let windowController = UsageConnectionWindowController(title: "Connect Cursor", webView: scraper.webView)
 
@@ -54,6 +60,8 @@ final class CursorSessionManager: CursorSessionManaging {
     }
 
     func fetchUsage(from usagePageURL: URL) async throws -> CursorUsageSnapshot {
+        await waitForWebsiteDataCleanup()
+
         let scraper = CursorWebViewScraper(mode: .background, usagePageURL: usagePageURL, dataStore: dataStore)
         activeScraper = scraper
         defer { activeScraper = nil }
@@ -66,13 +74,25 @@ final class CursorSessionManager: CursorSessionManaging {
         isConnected = false
         activeScraper?.cancel()
         connectionWindowController?.close()
-        clearWebsiteData()
+        startWebsiteDataCleanup()
     }
 
-    private func clearWebsiteData() {
-        let types = WKWebsiteDataStore.allWebsiteDataTypes()
-        dataStore.fetchDataRecords(ofTypes: types) { [dataStore] records in
-            dataStore.removeData(ofTypes: types, for: records) {}
+    private func startWebsiteDataCleanup() {
+        guard websiteDataCleanupTask == nil else {
+            return
         }
+
+        websiteDataCleanupTask = Task { [dataStore] in
+            await CursorWebsiteDataSupport.clearWebsiteData(in: dataStore)
+        }
+    }
+
+    private func waitForWebsiteDataCleanup() async {
+        guard let websiteDataCleanupTask else {
+            return
+        }
+
+        await websiteDataCleanupTask.value
+        self.websiteDataCleanupTask = nil
     }
 }

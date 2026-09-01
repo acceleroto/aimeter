@@ -17,6 +17,7 @@ final class CursorWebViewScraper: NSObject {
 
     private let mode: Mode
     private let usagePageURL: URL
+    private let dataStore: WKWebsiteDataStore
     private let timeoutSeconds: TimeInterval
     private let contentController: WKUserContentController
 
@@ -30,6 +31,7 @@ final class CursorWebViewScraper: NSObject {
     private var supplementalPlanLabel: String?
     private var lastUsageAPIError: String?
     private var hasRequestedProactiveUsageFetch = false
+    private var hasRetriedAfterHeaderTooLarge = false
     private var billingPhaseStartedAt: Date?
 
     private static let billingPageURL = URL(string: CursorDashboardParser.billingPageURL)!
@@ -37,6 +39,7 @@ final class CursorWebViewScraper: NSObject {
     init(mode: Mode, usagePageURL: URL, dataStore: WKWebsiteDataStore) {
         self.mode = mode
         self.usagePageURL = usagePageURL
+        self.dataStore = dataStore
         self.timeoutSeconds = mode == .interactive ? 180 : 60
 
         let contentController = WKUserContentController()
@@ -76,6 +79,7 @@ final class CursorWebViewScraper: NSObject {
             supplementalPlanLabel = nil
             lastUsageAPIError = nil
             hasRequestedProactiveUsageFetch = false
+            hasRetriedAfterHeaderTooLarge = false
             billingPhaseStartedAt = nil
             let request = URLRequest(url: usagePageURL)
             webView.load(request)
@@ -161,6 +165,10 @@ final class CursorWebViewScraper: NSObject {
 
             let text = result["text"] as? String ?? ""
             let url = result["url"] as? String ?? webView.url?.absoluteString ?? usagePageURL.absoluteString
+
+            if await handleRequestHeaderTooLargeIfNeeded(pageText: text) {
+                return
+            }
 
             await requestProactiveUsageFetchIfNeeded(currentURL: url)
 
@@ -254,6 +262,27 @@ final class CursorWebViewScraper: NSObject {
         }
 
         return Date().timeIntervalSince(billingPhaseStartedAt) > 12
+    }
+
+    private func handleRequestHeaderTooLargeIfNeeded(pageText: String) async -> Bool {
+        guard CursorWebsiteDataSupport.isRequestHeaderTooLargePage(pageText) else {
+            return false
+        }
+
+        if hasRetriedAfterHeaderTooLarge {
+            resolve(.failure(CursorUsageError.syncFailed(CursorWebsiteDataSupport.requestHeaderTooLargeRecoveryMessage)))
+            return true
+        }
+
+        hasRetriedAfterHeaderTooLarge = true
+        hasRequestedProactiveUsageFetch = false
+        deferredDOMSnapshot = nil
+        pendingUsageSnapshot = nil
+        loadPhase = .usage
+        billingPhaseStartedAt = nil
+        await CursorWebsiteDataSupport.clearWebsiteData(in: dataStore)
+        webView.load(URLRequest(url: usagePageURL))
+        return true
     }
 
     private func requestProactiveUsageFetchIfNeeded(currentURL: String) async {
@@ -367,6 +396,7 @@ final class CursorWebViewScraper: NSObject {
         supplementalPlanLabel = nil
         lastUsageAPIError = nil
         hasRequestedProactiveUsageFetch = false
+        hasRetriedAfterHeaderTooLarge = false
     }
 
     private static let messageHandlerName = "cursorNetworkBridge"

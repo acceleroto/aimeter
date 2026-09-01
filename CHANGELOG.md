@@ -18,6 +18,8 @@ This project follows semantic versioning while it is practical for a small macOS
 
 ### Fixed
 
+- Cursor Connect now uses an isolated WebKit session store so bloated shared cookies no longer trigger Vercel `494: REQUEST_HEADER_TOO_LARGE` when loading the spending dashboard.
+- Cursor sync automatically clears oversized local cookies and retries once, then shows a clear reconnect message if the dashboard still cannot load.
 - Cursor sync now prefers the dashboard `get-current-period-usage` response instead of unrelated page JSON or DOM text.
 - Cursor API/Auto percentages no longer get mis-scaled when Cursor returns whole-number percent values such as `1.0` for 1%.
 - Cursor DOM parsing is scoped to the Included usage section so on-demand or historical percentages are not mistaken for plan usage.
