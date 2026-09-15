@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuPopoverView: View {
     @ObservedObject var dashboardStore: DashboardStore
+    @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var cursorUsageCoordinator: CursorUsageCoordinator
     @ObservedObject var claudeUsageCoordinator: ClaudeUsageCoordinator
     @ObservedObject var openAIUsageCoordinator: OpenAIUsageCoordinator
@@ -17,6 +18,10 @@ struct MenuPopoverView: View {
     let onDisconnectOpenAI: () -> Void
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
+
+    private var countDownPercentages: Bool {
+        settingsStore.settings.menuBar.countDownPercentages
+    }
 
     var body: some View {
         let state = dashboardStore.state
@@ -196,16 +201,13 @@ struct MenuPopoverView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(snapshot.primaryMetric.value)
+                    Text(displayPercentText(for: snapshot.primaryMetric))
                         .font(.title3.weight(.semibold))
                         .monospacedDigit()
                         .multilineTextAlignment(.trailing)
                         .lineLimit(3)
                     if showsResetInHeader(for: snapshot.provider), let primaryResetText {
-                        Text(primaryResetText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        resetCaptionStack(primaryResetText, alignment: .trailing)
                     }
                 }
             }
@@ -216,10 +218,7 @@ struct MenuPopoverView: View {
             }
 
             if !showsResetInHeader(for: snapshot.provider), let primaryResetText {
-                Text(primaryResetText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                resetCaptionStack(primaryResetText, alignment: .leading)
             }
 
             if !unpairedStatusMetrics.isEmpty {
@@ -235,6 +234,9 @@ struct MenuPopoverView: View {
                     metrics: usageMetrics,
                     resetText: { metric in
                         resetText(for: metric, statusMetrics: statusMetrics)
+                    },
+                    percentText: { metric in
+                        displayPercentText(for: metric)
                     }
                 )
             }
@@ -298,14 +300,27 @@ struct MenuPopoverView: View {
     }
 
     private func statusMetricLine(_ metric: UsageMetric) -> some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 6) {
             Text(metric.title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(metric.value)
+            resetCaptionStack(metric.value, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func resetCaptionStack(_ text: String, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 1) {
+            Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+            if let relative = DisplayFormatting.relativeResetLine(from: text) {
+                Text(relative)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -317,6 +332,14 @@ struct MenuPopoverView: View {
             metric.title.caseInsensitiveCompare("Reset") == .orderedSame ||
                 metric.title.caseInsensitiveCompare("\(snapshot.primaryMetric.title) reset") == .orderedSame
         }?.value
+    }
+
+    private func displayPercentText(for metric: UsageMetric) -> String {
+        if let percent = metric.percent {
+            return DisplayFormatting.displayPercent(used: percent, countDown: countDownPercentages)
+        }
+
+        return metric.value
     }
 
     private func resetText(

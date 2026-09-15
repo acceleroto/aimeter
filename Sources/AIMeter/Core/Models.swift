@@ -4,21 +4,26 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
     var showProgressBar: Bool
     var showCursorAutoAPIPercentages: Bool
     var showOpenAICodexPercentages: Bool
+    /// When true, percentage labels show remaining capacity (counting down) instead of usage used.
+    var countDownPercentages: Bool
 
     private enum CodingKeys: String, CodingKey {
         case showProgressBar
         case showCursorAutoAPIPercentages
         case showOpenAICodexPercentages
+        case countDownPercentages
     }
 
     init(
         showProgressBar: Bool,
         showCursorAutoAPIPercentages: Bool,
-        showOpenAICodexPercentages: Bool = false
+        showOpenAICodexPercentages: Bool = false,
+        countDownPercentages: Bool = false
     ) {
         self.showProgressBar = showProgressBar
         self.showCursorAutoAPIPercentages = showCursorAutoAPIPercentages
         self.showOpenAICodexPercentages = showOpenAICodexPercentages
+        self.countDownPercentages = countDownPercentages
     }
 
     init(from decoder: Decoder) throws {
@@ -32,12 +37,17 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
             Bool.self,
             forKey: .showOpenAICodexPercentages
         ) ?? Self.default.showOpenAICodexPercentages
+        countDownPercentages = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .countDownPercentages
+        ) ?? Self.default.countDownPercentages
     }
 
     static let `default` = MenuBarAppearanceSettings(
         showProgressBar: true,
         showCursorAutoAPIPercentages: false,
-        showOpenAICodexPercentages: false
+        showOpenAICodexPercentages: false,
+        countDownPercentages: false
     )
 
     var hasAtLeastOneDisplayOption: Bool {

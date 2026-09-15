@@ -83,6 +83,7 @@ final class MenuBarController: NSObject {
         popover.contentViewController = NSHostingController(
             rootView: MenuPopoverView(
                 dashboardStore: dashboardStore,
+                settingsStore: settingsStore,
                 cursorUsageCoordinator: cursorUsageCoordinator,
                 claudeUsageCoordinator: claudeUsageCoordinator,
                 openAIUsageCoordinator: openAIUsageCoordinator,
@@ -204,7 +205,7 @@ final class MenuBarController: NSObject {
         var lines = connectedSnapshots
             .map { snapshot in
                 if let progressPercent = snapshot.progressPercent, snapshot.connectionState == .connected {
-                    return "\(snapshot.provider.displayName): \(DisplayFormatting.percent(progressPercent)) - \(snapshot.planLabel)"
+                    return "\(snapshot.provider.displayName): \(DisplayFormatting.displayPercent(used: progressPercent, countDown: settings.menuBar.countDownPercentages)) - \(snapshot.planLabel)"
                 }
 
                 return "\(snapshot.provider.displayName): \(snapshot.connectionState.displayText)"
@@ -214,7 +215,7 @@ final class MenuBarController: NSObject {
             let cursor = state.cursorSnapshot
             if cursor.connectionState != .disconnected, cursor.hasSuccessfulSync {
                 lines.append(
-                    "Cursor Auto: \(DisplayFormatting.percent(cursor.autoUsedPercent)), API: \(DisplayFormatting.percent(cursor.apiUsedPercent))"
+                    "Cursor Auto: \(DisplayFormatting.displayPercent(used: cursor.autoUsedPercent, countDown: settings.menuBar.countDownPercentages)), API: \(DisplayFormatting.displayPercent(used: cursor.apiUsedPercent, countDown: settings.menuBar.countDownPercentages))"
                 )
             }
         }
@@ -223,7 +224,7 @@ final class MenuBarController: NSObject {
             let openAI = state.openaiSnapshot
             if openAI.connectionState != .disconnected, openAI.hasSuccessfulSync, let weekly = openAI.weeklyPercent {
                 lines.append(
-                    "OpenAI Weekly: \(DisplayFormatting.percent(weekly))"
+                    "OpenAI Weekly: \(DisplayFormatting.displayPercent(used: weekly, countDown: settings.menuBar.countDownPercentages))"
                 )
             }
         }

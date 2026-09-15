@@ -4,6 +4,7 @@ import SwiftUI
 struct UsageMetricCardsRow: View {
     let metrics: [UsageMetric]
     let resetText: (UsageMetric) -> String?
+    let percentText: (UsageMetric) -> String
 
     @State private var rowHeight: CGFloat = 0
 
@@ -12,7 +13,7 @@ struct UsageMetricCardsRow: View {
             ForEach(metrics, id: \.title) { metric in
                 UsageMetricCard(
                     title: metric.title,
-                    value: metric.value,
+                    value: percentText(metric),
                     subtitle: resetText(metric)
                 )
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -55,12 +56,20 @@ private struct UsageMetricCard: View {
                 .minimumScaleFactor(0.85)
 
             if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let relative = DisplayFormatting.relativeResetLine(from: subtitle) {
+                        Text(relative)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
         }
         .padding(10)

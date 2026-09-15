@@ -139,6 +139,38 @@ final class MenuBarDisplayTests: XCTestCase {
         XCTAssertEqual(display.titleText, "9%/48% | 15%")
     }
 
+    func testCountDownPercentagesInvertMenuBarSuffixes() {
+        let cursor = CursorUsageSnapshot(
+            planLabel: "Pro",
+            totalUsedPercent: 17.4,
+            autoUsedPercent: 9,
+            apiUsedPercent: 100,
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+        let openAI = ProviderUsageSnapshot(
+            provider: .openai,
+            planLabel: "ChatGPT Plus",
+            primaryMetric: UsageMetric(title: "Weekly", value: "21%", percent: 21),
+            secondaryMetrics: [],
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: true,
+                showOpenAICodexPercentages: true,
+                countDownPercentages: true
+            ),
+            cursorSnapshot: cursor,
+            openAISnapshot: openAI
+        )
+
+        XCTAssertEqual(display.titleText, "91%/0% | 79%")
+    }
+
     func testNormalizedEnablesProgressBarWhenAllFlagsFalse() {
         let settings = MenuBarAppearanceSettings(
             showProgressBar: false,

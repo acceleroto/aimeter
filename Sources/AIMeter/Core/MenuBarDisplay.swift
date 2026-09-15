@@ -48,11 +48,23 @@ enum MenuBarDisplayResolver {
         var segments: [String] = []
 
         if settings.showCursorAutoAPIPercentages {
-            segments.append(cursorSegment(from: cursorSnapshot, showPlaceholderWhenEmpty: !settings.showProgressBar))
+            segments.append(
+                cursorSegment(
+                    from: cursorSnapshot,
+                    showPlaceholderWhenEmpty: !settings.showProgressBar,
+                    countDown: settings.countDownPercentages
+                )
+            )
         }
 
         if settings.showOpenAICodexPercentages {
-            segments.append(openAISegment(from: openAISnapshot, showPlaceholderWhenEmpty: !settings.showProgressBar))
+            segments.append(
+                openAISegment(
+                    from: openAISnapshot,
+                    showPlaceholderWhenEmpty: !settings.showProgressBar,
+                    countDown: settings.countDownPercentages
+                )
+            )
         }
 
         return segments.joined(separator: segmentSeparator)
@@ -60,9 +72,10 @@ enum MenuBarDisplayResolver {
 
     private static func cursorSegment(
         from snapshot: ProviderUsageSnapshot,
-        showPlaceholderWhenEmpty: Bool
+        showPlaceholderWhenEmpty: Bool,
+        countDown: Bool
     ) -> String {
-        if let suffix = cursorAutoAPISuffix(from: snapshot) {
+        if let suffix = cursorAutoAPISuffix(from: snapshot, countDown: countDown) {
             return suffix
         }
 
@@ -71,27 +84,29 @@ enum MenuBarDisplayResolver {
 
     private static func openAISegment(
         from snapshot: ProviderUsageSnapshot,
-        showPlaceholderWhenEmpty: Bool
+        showPlaceholderWhenEmpty: Bool,
+        countDown: Bool
     ) -> String {
-        if let suffix = openAICodexSuffix(from: snapshot) {
+        if let suffix = openAICodexSuffix(from: snapshot, countDown: countDown) {
             return suffix
         }
 
         return showPlaceholderWhenEmpty ? openAIPlaceholderSuffix : ""
     }
 
-    private static func cursorAutoAPISuffix(from snapshot: ProviderUsageSnapshot) -> String? {
+    private static func cursorAutoAPISuffix(from snapshot: ProviderUsageSnapshot, countDown: Bool) -> String? {
         guard snapshot.connectionState != .disconnected, snapshot.hasSuccessfulSync else {
             return nil
         }
 
         return DisplayFormatting.menuBarCursorAutoAPISuffix(
             auto: snapshot.autoUsedPercent,
-            api: snapshot.apiUsedPercent
+            api: snapshot.apiUsedPercent,
+            countDown: countDown
         )
     }
 
-    private static func openAICodexSuffix(from snapshot: ProviderUsageSnapshot) -> String? {
+    private static func openAICodexSuffix(from snapshot: ProviderUsageSnapshot, countDown: Bool) -> String? {
         guard
             snapshot.provider == .openai,
             snapshot.connectionState != .disconnected,
@@ -101,6 +116,6 @@ enum MenuBarDisplayResolver {
             return nil
         }
 
-        return DisplayFormatting.menuBarOpenAICodexSuffix(weekly: weekly)
+        return DisplayFormatting.menuBarOpenAICodexSuffix(weekly: weekly, countDown: countDown)
     }
 }

@@ -5,6 +5,16 @@ enum DisplayFormatting {
         compactPercent(value)
     }
 
+    /// Converts a usage-used percentage into the value shown in the UI.
+    static func displayPercentValue(used usedPercent: Double, countDown: Bool) -> Double {
+        let clamped = min(max(usedPercent, 0), 100)
+        return countDown ? 100 - clamped : clamped
+    }
+
+    static func displayPercent(used usedPercent: Double, countDown: Bool) -> String {
+        compactPercent(displayPercentValue(used: usedPercent, countDown: countDown))
+    }
+
     static func compactPercent(_ value: Double) -> String {
         let clamped = min(max(value, 0), 100)
 
@@ -28,12 +38,12 @@ enum DisplayFormatting {
         return "\(Int(clamped.rounded()))%"
     }
 
-    static func menuBarCursorAutoAPISuffix(auto: Double, api: Double) -> String {
-        "\(menuBarPercent(auto))/\(menuBarPercent(api))"
+    static func menuBarCursorAutoAPISuffix(auto: Double, api: Double, countDown: Bool = false) -> String {
+        "\(menuBarPercent(displayPercentValue(used: auto, countDown: countDown)))/\(menuBarPercent(displayPercentValue(used: api, countDown: countDown)))"
     }
 
-    static func menuBarOpenAICodexSuffix(weekly: Double) -> String {
-        menuBarPercent(weekly)
+    static func menuBarOpenAICodexSuffix(weekly: Double, countDown: Bool = false) -> String {
+        menuBarPercent(displayPercentValue(used: weekly, countDown: countDown))
     }
 
     static func resetInDays(until resetDate: Date, from referenceDate: Date = Date()) -> String {
@@ -79,11 +89,34 @@ enum DisplayFormatting {
             return nil
         }
 
-        if let resetDate = parseResetDate(from: trimmed) {
+        if let resetDate = parseResetDate(from: trimmed, referenceDate: referenceDate) {
             return resetInDays(until: resetDate, from: referenceDate)
         }
 
         return nil
+    }
+
+    /// Relative "Resets in X days" line to show beneath an absolute "Resets <date>" value.
+    /// Returns nil when the text is already relative, a short interval, or cannot be parsed.
+    static func relativeResetLine(from text: String, referenceDate: Date = Date()) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        if daysFromRelativeResetPhrase(in: trimmed) != nil {
+            return nil
+        }
+
+        guard let relative = resetDisplay(from: trimmed, referenceDate: referenceDate) else {
+            return nil
+        }
+
+        if trimmed.caseInsensitiveCompare(relative) == .orderedSame {
+            return nil
+        }
+
+        return relative
     }
 
     private static func containsShortIntervalReset(lower: String) -> Bool {
@@ -122,7 +155,7 @@ enum DisplayFormatting {
         }
     }
 
-    private static func parseResetDate(from text: String) -> Date? {
+    private static func parseResetDate(from text: String, referenceDate: Date = Date()) -> Date? {
         let formats = [
             "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
             "yyyy-MM-dd'T'HH:mm:ssZ",
@@ -169,7 +202,94 @@ enum DisplayFormatting {
             }
         }
 
+        if let weekdayDate = parseWeekdayResetDate(from: text, referenceDate: referenceDate) {
+            return weekdayDate
+        }
+
         return nil
+    }
+
+    private static func parseWeekdayResetDate(from text: String, referenceDate: Date) -> Date? {
+        let pattern =
+            #"(?i)resets?\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\b(?:\s+(\d{1,2}:\d{2}\s*[ap]m))?"#
+        guard
+            let regex = try? NSRegularExpression(pattern: pattern),
+            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+            let weekdayRange = Range(match.range(at: 1), in: text),
+            let weekday = calendarWeekday(from: String(text[weekdayRange]))
+        else {
+            return nil
+        }
+
+        var timeComponents: DateComponents?
+        if match.numberOfRanges > 2,
+           match.range(at: 2).location != NSNotFound,
+           let timeRange = Range(match.range(at: 2), in: text)
+        {
+            timeComponents = parseClockTime(String(text[timeRange]))
+        }
+
+        return nextDate(matchingWeekday: weekday, time: timeComponents, from: referenceDate)
+    }
+
+    private static func calendarWeekday(from token: String) -> Int? {
+        switch token.lowercased() {
+        case "sun", "sunday":
+            return 1
+        case "mon", "monday":
+            return 2
+        case "tue", "tues", "tuesday":
+            return 3
+        case "wed", "wednesday":
+            return 4
+        case "thu", "thur", "thurs", "thursday":
+            return 5
+        case "fri", "friday":
+            return 6
+        case "sat", "saturday":
+            return 7
+        default:
+            return nil
+        }
+    }
+
+    private static func parseClockTime(_ text: String) -> DateComponents? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "h:mm a"
+        guard let date = formatter.date(from: text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+
+        return Calendar.current.dateComponents([.hour, .minute], from: date)
+    }
+
+    private static func nextDate(
+        matchingWeekday targetWeekday: Int,
+        time: DateComponents?,
+        from referenceDate: Date
+    ) -> Date? {
+        let calendar = Calendar.current
+        let referenceWeekday = calendar.component(.weekday, from: referenceDate)
+        var daysToAdd = (targetWeekday - referenceWeekday + 7) % 7
+
+        if daysToAdd == 0, let time {
+            var components = calendar.dateComponents([.year, .month, .day], from: referenceDate)
+            components.hour = time.hour
+            components.minute = time.minute
+            if let todayAtTime = calendar.date(from: components), todayAtTime <= referenceDate {
+                daysToAdd = 7
+            }
+        }
+
+        guard let startOfDay = calendar.date(
+            from: calendar.dateComponents([.year, .month, .day], from: referenceDate)
+        ) else {
+            return nil
+        }
+
+        return calendar.date(byAdding: .day, value: daysToAdd, to: startOfDay)
     }
 
     static func relativeTimestamp(_ date: Date?, relativeTo referenceDate: Date = Date()) -> String {

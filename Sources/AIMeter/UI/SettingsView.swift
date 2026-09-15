@@ -25,6 +25,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Toggle("Count percentages down (remaining)", isOn: countDownPercentagesBinding)
+
+                Text("Show how much capacity remains instead of how much has been used.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 if let statusMessage = launchAtLoginController.statusMessage {
                     Text(statusMessage)
                         .font(.caption)
@@ -92,6 +98,13 @@ struct SettingsView: View {
         Binding(
             get: { settingsStore.settings.menuBar.showProgressBar },
             set: { settingsStore.setShowProgressBar($0) }
+        )
+    }
+
+    private var countDownPercentagesBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.countDownPercentages },
+            set: { settingsStore.setCountDownPercentages($0) }
         )
     }
 

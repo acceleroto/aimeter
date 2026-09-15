@@ -148,6 +148,20 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(secondStore.settings.menuBar.showOpenAICodexPercentages)
     }
 
+    func testCountDownPercentagesPersistAcrossReloads() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let firstStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertFalse(firstStore.settings.menuBar.countDownPercentages)
+
+        firstStore.setCountDownPercentages(true)
+
+        let secondStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertTrue(secondStore.settings.menuBar.countDownPercentages)
+    }
+
     func testExistingSettingsWithoutMenuBarDefaultMenuBarAppearance() throws {
         let suiteName = #function
         let userDefaults = UserDefaults(suiteName: suiteName)!

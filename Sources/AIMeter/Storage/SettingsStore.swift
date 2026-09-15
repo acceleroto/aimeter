@@ -100,6 +100,14 @@ final class SettingsStore: ObservableObject {
         settings = updated
     }
 
+    func setCountDownPercentages(_ enabled: Bool) {
+        var updated = settings
+        var menuBar = updated.menuBar.normalized()
+        menuBar.countDownPercentages = enabled
+        updated.menuBar = menuBar
+        settings = updated
+    }
+
     private func persist() {
         guard let encoded = try? JSONEncoder().encode(settings) else {
             return
