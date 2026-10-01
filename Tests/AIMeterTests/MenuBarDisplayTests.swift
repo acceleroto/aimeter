@@ -108,6 +108,85 @@ final class MenuBarDisplayTests: XCTestCase {
         XCTAssertEqual(display.titleText, "15%")
     }
 
+    func testShowsClaudeFiveHourAndWeeklySuffixOnly() {
+        let claude = ProviderUsageSnapshot(
+            provider: .claude,
+            planLabel: "Claude Max",
+            primaryMetric: UsageMetric(title: "Current session", value: "24%", percent: 24),
+            secondaryMetrics: [
+                UsageMetric(title: "All models", value: "61%", percent: 61)
+            ],
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: false,
+                showClaudeUsagePercentages: true
+            ),
+            cursorSnapshot: .cursorDisconnected,
+            openAISnapshot: .openaiDisconnected,
+            claudeSnapshot: claude
+        )
+
+        XCTAssertEqual(display.titleText, "24%/61%")
+    }
+
+    func testCountDownClaudePercentagesInvertMenuBarSuffix() {
+        let claude = ProviderUsageSnapshot(
+            provider: .claude,
+            planLabel: "Claude Pro",
+            primaryMetric: UsageMetric(title: "Current session", value: "12%", percent: 12),
+            secondaryMetrics: [
+                UsageMetric(title: "All models", value: "74%", percent: 74)
+            ],
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: false,
+                showClaudeUsagePercentages: true,
+                countDownPercentages: true
+            ),
+            cursorSnapshot: .cursorDisconnected,
+            openAISnapshot: .openaiDisconnected,
+            claudeSnapshot: claude
+        )
+
+        XCTAssertEqual(display.titleText, "88%/26%")
+    }
+
+    func testShowsClaudeWeeklyAliasFromSnapshot() {
+        let claude = ProviderUsageSnapshot(
+            provider: .claude,
+            planLabel: "Claude Pro",
+            primaryMetric: UsageMetric(title: "Current session", value: "25%", percent: 25),
+            secondaryMetrics: [
+                UsageMetric(title: "Weekly", value: "32%", percent: 32)
+            ],
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+
+        let display = MenuBarDisplayResolver.resolve(
+            menuBar: MenuBarAppearanceSettings(
+                showProgressBar: false,
+                showCursorAutoAPIPercentages: false,
+                showClaudeUsagePercentages: true
+            ),
+            cursorSnapshot: .cursorDisconnected,
+            openAISnapshot: .openaiDisconnected,
+            claudeSnapshot: claude
+        )
+
+        XCTAssertEqual(display.titleText, "25%/32%")
+    }
+
     func testShowsCursorThenOpenAISegmentsSeparatedByPipe() {
         let cursor = CursorUsageSnapshot(
             planLabel: "Pro",

@@ -46,6 +46,20 @@ enum DisplayFormatting {
         menuBarPercent(displayPercentValue(used: weekly, countDown: countDown))
     }
 
+    static func menuBarClaudeUsageSuffix(
+        fiveHour: Double?,
+        weekly: Double?,
+        countDown: Bool = false
+    ) -> String {
+        let fiveHourText = fiveHour.map {
+            menuBarPercent(displayPercentValue(used: $0, countDown: countDown))
+        } ?? "--"
+        let weeklyText = weekly.map {
+            menuBarPercent(displayPercentValue(used: $0, countDown: countDown))
+        } ?? "--"
+        return "\(fiveHourText)/\(weeklyText)"
+    }
+
     static func resetInDays(until resetDate: Date, from referenceDate: Date = Date()) -> String {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: referenceDate)
@@ -94,6 +108,18 @@ enum DisplayFormatting {
         }
 
         return nil
+    }
+
+    /// Formats an absolute reset timestamp in the same style used by provider reset captions.
+    static func resetDateDisplay(from text: String) -> String? {
+        guard let resetDate = parseResetDate(from: text) else {
+            return nil
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return "Resets \(formatter.string(from: resetDate))"
     }
 
     /// Relative "Resets in X days" line to show beneath an absolute "Resets <date>" value.
@@ -170,14 +196,8 @@ enum DisplayFormatting {
             in: text,
             pattern: #"(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?)"#
         ) {
-            for format in formats {
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "en_US_POSIX")
-                formatter.timeZone = TimeZone.current
-                formatter.dateFormat = format
-                if let date = formatter.date(from: iso) {
-                    return date
-                }
+            if let date = parseISO8601Date(iso) {
+                return date
             }
         }
 
@@ -207,6 +227,46 @@ enum DisplayFormatting {
         }
 
         return nil
+    }
+
+    private static func parseISO8601Date(_ value: String) -> Date? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let normalized = normalizedISO8601Fraction(in: trimmed)
+        let candidates = normalized == trimmed ? [trimmed] : [normalized, trimmed]
+
+        for candidate in candidates {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: candidate) {
+                return date
+            }
+
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: candidate) {
+                return date
+            }
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withFullDate]
+        return dateFormatter.date(from: String(trimmed.prefix(10)))
+    }
+
+    private static func normalizedISO8601Fraction(in value: String) -> String {
+        guard let range = value.range(of: #"\.\d+"#, options: .regularExpression) else {
+            return value
+        }
+
+        let fraction = String(value[range])
+        guard fraction.count > 4 else {
+            return value
+        }
+
+        return value.replacingCharacters(in: range, with: String(fraction.prefix(4)))
     }
 
     private static func parseWeekdayResetDate(from text: String, referenceDate: Date) -> Date? {

@@ -136,7 +136,13 @@ final class ClaudeWebViewScraper: NSObject {
         ({
           text: (() => {
             const bodyText = document.body ? document.body.innerText : "";
-            const isUsageSettingsPage = window.location.pathname.replace(/\\/+$/, "") === "/settings/usage";
+            const isUsageSettingsPage = (() => {
+              if (window.location.pathname.replace(/\\/+$/, "") === "/settings/usage") {
+                return true;
+              }
+              const hash = window.location.hash.replace(/^#\\/?/, "").replace(/\\/+$/, "");
+              return hash.indexOf("settings/usage") === 0;
+            })();
             const visibleNodeText = (() => {
               if (!isUsageSettingsPage || !document.body) {
                 return "";
@@ -187,7 +193,7 @@ final class ClaudeWebViewScraper: NSObject {
                   if (
                     text.length > 0 &&
                     text.length < 600 &&
-                    /current session|all models|claude design|daily included routine runs|extra usage|\\$0\\.00 spent/i.test(text)
+                    /current session|all models|weekly|claude design|daily included routine runs|extra usage|\\$0\\.00 spent/i.test(text)
                   ) {
                     nearby = text;
                     break;
@@ -205,6 +211,11 @@ final class ClaudeWebViewScraper: NSObject {
           })(),
           url: window.location.href,
           signedInAppShell: (() => {
+            const pathname = window.location.pathname.replace(/\\/+$/, "").toLowerCase();
+            if (/^\\/(?:login|logout|magic-link|verify|sso-callback|oauth|onboarding|device-code-verify)(?:\\/|$)/.test(pathname)) {
+              return false;
+            }
+
             const text = (document.body && document.body.innerText || "").toLowerCase();
             if (text.includes("continue with email") || text.includes("continue with google")) {
               return false;
@@ -260,7 +271,8 @@ final class ClaudeWebViewScraper: NSObject {
             case .noMatch
                 where signedInAppShell
                     && ClaudeURLValidator.isAllowedClaudeURLString(url)
-                    && !ClaudeURLValidator.isUsageSettingsURLString(url):
+                    && !ClaudeURLValidator.isUsageSettingsURLString(url)
+                    && !ClaudeURLValidator.isAuthFlowURLString(url):
                 if mode == .interactive {
                     webView.load(URLRequest(url: usagePageURL))
                 } else {
@@ -313,7 +325,8 @@ final class ClaudeWebViewScraper: NSObject {
         signedInAppShell: Bool
     ) {
         guard mode == .interactive else {
-            if hasResetDetails(snapshot) || !ClaudeURLValidator.isUsageSettingsURLString(currentPageURL) {
+            if !ClaudeURLValidator.isUsageSettingsURLString(currentPageURL)
+                || canResolveUsageSnapshot(snapshot) {
                 resolve(.success(snapshot))
             } else {
                 deferUsageSnapshot(snapshot)
@@ -322,7 +335,11 @@ final class ClaudeWebViewScraper: NSObject {
         }
 
         guard ClaudeURLValidator.isUsageSettingsURLString(currentPageURL) else {
-            if signedInAppShell || isSignedInOnlySnapshot(snapshot) {
+            // Keep the verification flow in place until Claude finishes
+            // establishing the session. Navigating away from /login here
+            // resets the email sign-in attempt.
+            if !ClaudeURLValidator.isAuthFlowURLString(currentPageURL),
+               signedInAppShell || isSignedInOnlySnapshot(snapshot) {
                 webView.load(URLRequest(url: usagePageURL))
             }
             return
@@ -332,7 +349,7 @@ final class ClaudeWebViewScraper: NSObject {
             return
         }
 
-        guard hasResetDetails(snapshot) else {
+        guard canResolveUsageSnapshot(snapshot) else {
             deferUsageSnapshot(snapshot)
             return
         }
@@ -342,7 +359,7 @@ final class ClaudeWebViewScraper: NSObject {
 
     private func handleParsedNetworkSnapshot(_ snapshot: ProviderUsageSnapshot, currentPageURL: String) {
         guard mode == .interactive else {
-            if hasResetDetails(snapshot) {
+            if canResolveUsageSnapshot(snapshot) {
                 resolve(.success(snapshot))
             } else {
                 deferUsageSnapshot(snapshot)
@@ -358,7 +375,7 @@ final class ClaudeWebViewScraper: NSObject {
             return
         }
 
-        guard hasResetDetails(snapshot) else {
+        guard canResolveUsageSnapshot(snapshot) else {
             deferUsageSnapshot(snapshot)
             return
         }
@@ -393,6 +410,12 @@ final class ClaudeWebViewScraper: NSObject {
             let value = metric.value.lowercased()
             return title.contains("reset") || value.contains("reset") || value.contains("resets")
         }
+    }
+
+    private func canResolveUsageSnapshot(_ snapshot: ProviderUsageSnapshot) -> Bool {
+        hasResetDetails(snapshot)
+            && snapshot.claudeFiveHourPercent != nil
+            && snapshot.claudeWeeklyPercent != nil
     }
 
     private func resolve(_ result: Result<ProviderUsageSnapshot, Error>) {

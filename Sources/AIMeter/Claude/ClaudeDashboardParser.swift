@@ -27,6 +27,10 @@ enum ClaudeDashboardParser {
             let data = trimmedBody.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data)
         {
+            if let snapshot = snapshotFromJSONObject(object) {
+                return .usage(snapshot)
+            }
+
             let leafText = DashboardParserSupport.jsonLeafStrings(from: object).joined(separator: "\n")
             return parseText(
                 leafText,
@@ -42,6 +46,172 @@ enum ClaudeDashboardParser {
             allowAuthDetection: false,
             requireUsagePercent: true
         )
+    }
+
+    private static func snapshotFromJSONObject(_ object: Any) -> ProviderUsageSnapshot? {
+        var metrics: [UsageMetric] = []
+
+        if let metric = directWindowMetric(
+            from: object,
+            key: "five_hour",
+            usageTitle: "Current session",
+            resetTitle: "Reset"
+        ) {
+            metrics.append(contentsOf: metric)
+        }
+
+        if let metric = directWindowMetric(
+            from: object,
+            key: "seven_day",
+            usageTitle: "All models",
+            resetTitle: "All models reset"
+        ) {
+            metrics.append(contentsOf: metric)
+        }
+
+        metrics.append(contentsOf: limitMetrics(from: object))
+        metrics = metrics.removingDuplicateMetrics()
+
+        guard
+            let primaryMetric = metrics.first(where: {
+                $0.title.caseInsensitiveCompare("Current session") == .orderedSame
+            }) ?? metrics.first(where: { $0.percent != nil })
+        else {
+            return nil
+        }
+
+        let leafText = DashboardParserSupport.jsonLeafStrings(from: object).joined(separator: "\n")
+        return ProviderUsageSnapshot(
+            provider: .claude,
+            planLabel: planLabel(
+                from: DashboardParserSupport.normalizedLines(from: leafText)
+            ),
+            primaryMetric: primaryMetric,
+            secondaryMetrics: metrics.filter {
+                $0.title.caseInsensitiveCompare(primaryMetric.title) != .orderedSame
+            },
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+    }
+
+    private static func directWindowMetric(
+        from object: Any,
+        key: String,
+        usageTitle: String,
+        resetTitle: String
+    ) -> [UsageMetric]? {
+        guard
+            let root = object as? [String: Any],
+            let window = root[key] as? [String: Any],
+            let utilization = numericValue(window["utilization"])
+        else {
+            return nil
+        }
+
+        var metrics = [
+            UsageMetric(
+                title: usageTitle,
+                value: DisplayFormatting.percent(DashboardParserSupport.normalizePercent(utilization)),
+                percent: DashboardParserSupport.normalizePercent(utilization)
+            )
+        ]
+
+        if let resetValue = window["resets_at"] as? String {
+            metrics.append(
+                UsageMetric(
+                    title: resetTitle,
+                    value: resetDisplay(from: resetValue)
+                )
+            )
+        }
+
+        return metrics
+    }
+
+    private static func limitMetrics(from object: Any) -> [UsageMetric] {
+        guard
+            let root = object as? [String: Any],
+            let limits = root["limits"] as? [Any]
+        else {
+            return []
+        }
+
+        var metrics: [UsageMetric] = []
+        for limit in limits {
+            guard
+                let limit = limit as? [String: Any],
+                let percentValue = numericValue(limit["percent"]),
+                let kind = limit["kind"] as? String
+            else {
+                continue
+            }
+
+            let usageTitle: String
+            let resetTitle: String
+            switch kind.lowercased() {
+            case "session":
+                usageTitle = "Current session"
+                resetTitle = "Reset"
+            case "weekly_all":
+                usageTitle = "All models"
+                resetTitle = "All models reset"
+            case "weekly_scoped":
+                guard
+                    let scope = limit["scope"] as? [String: Any],
+                    let model = scope["model"] as? [String: Any],
+                    let displayName = model["display_name"] as? String
+                else {
+                    continue
+                }
+                usageTitle = displayName
+                resetTitle = "\(displayName) reset"
+            default:
+                continue
+            }
+
+            metrics.append(
+                UsageMetric(
+                    title: usageTitle,
+                    value: DisplayFormatting.percent(DashboardParserSupport.normalizePercent(percentValue)),
+                    percent: DashboardParserSupport.normalizePercent(percentValue)
+                )
+            )
+
+            if let resetValue = limit["resets_at"] as? String {
+                metrics.append(
+                    UsageMetric(
+                        title: resetTitle,
+                        value: resetDisplay(from: resetValue)
+                    )
+                )
+            }
+        }
+
+        return metrics
+    }
+
+    private static func numericValue(_ value: Any?) -> Double? {
+        (value as? NSNumber)?.doubleValue
+    }
+
+    private static func resetDisplay(from rawValue: String) -> String {
+        if let formattedDate = DisplayFormatting.resetDateDisplay(from: rawValue) {
+            return formattedDate
+        }
+
+        guard
+            let date = ISO8601DateFormatter().date(from: rawValue)
+        else {
+            return rawValue.localizedCaseInsensitiveContains("reset")
+                ? rawValue
+                : "Resets \(rawValue)"
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return "Resets \(formatter.string(from: date))"
     }
 
     private static func parseText(
@@ -359,6 +529,13 @@ enum ClaudeDashboardParser {
             return "Current session"
         }
         if lowercased == "all models" {
+            return "All models"
+        }
+        if lowercased == "weekly"
+            || lowercased == "weekly limit"
+            || lowercased == "weekly limits"
+            || lowercased == "weekly usage"
+        {
             return "All models"
         }
         if lowercased == "claude design" {

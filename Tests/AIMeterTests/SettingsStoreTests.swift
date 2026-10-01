@@ -148,6 +148,34 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(secondStore.settings.menuBar.showOpenAICodexPercentages)
     }
 
+    func testClaudeUsagePercentagesPersistAcrossReloads() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let firstStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertFalse(firstStore.settings.menuBar.showClaudeUsagePercentages)
+
+        firstStore.setShowClaudeUsagePercentages(true)
+
+        let secondStore = SettingsStore(userDefaults: userDefaults)
+        XCTAssertTrue(secondStore.settings.menuBar.showClaudeUsagePercentages)
+    }
+
+    func testDisablingClaudePercentagesEnablesProgressBarWhenNeeded() {
+        let suiteName = #function
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(userDefaults: userDefaults)
+        store.setShowClaudeUsagePercentages(true)
+        store.setShowProgressBar(false)
+        store.setShowClaudeUsagePercentages(false)
+
+        XCTAssertTrue(store.settings.menuBar.showProgressBar)
+        XCTAssertFalse(store.settings.menuBar.showClaudeUsagePercentages)
+    }
+
     func testCountDownPercentagesPersistAcrossReloads() {
         let suiteName = #function
         let userDefaults = UserDefaults(suiteName: suiteName)!

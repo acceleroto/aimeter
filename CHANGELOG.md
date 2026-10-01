@@ -4,20 +4,26 @@ All notable changes to AIMeter will be documented in this file.
 
 This project follows semantic versioning while it is practical for a small macOS utility.
 
-## Unreleased
+## [0.6.0] - 2026-09-30
 
 ### Added
 
 - General setting to hide the menu bar progress bar when Cursor Auto and API percentages are shown instead.
+- Optional Claude 5-hour and weekly percentage display in the menu bar.
+- OpenAI ChatGPT Plus Codex usage tracking for weekly limits, credits, and reset timing.
 
 ### Changed
 
 - Menu bar display always keeps at least one of the progress bar or Cursor Auto/API percentages visible; percentages-only mode shows `--/--` when Cursor has not synced yet.
 - Cursor usage now reads from the [spending dashboard](https://cursor.com/dashboard/spending) instead of `cursor.com/settings`.
 - Saved Cursor settings that still pointed at the old settings URL are migrated to the spending dashboard automatically.
+- Claude reset timestamps are shown in local date/time format, and the weekly usage card includes its own progress bar.
 
 ### Fixed
 
+- Claude email verification pages are no longer mistaken for the signed-in app, so email login is not interrupted before the session is established.
+- Claude usage settings detection supports the current hash-routed settings modal.
+- Claude usage API responses now preserve the all-model weekly utilization alongside the five-hour meter.
 - Cursor Connect now uses an isolated WebKit session store so bloated shared cookies no longer trigger Vercel `494: REQUEST_HEADER_TOO_LARGE` when loading the spending dashboard.
 - Cursor sync automatically clears oversized local cookies and retries once, then shows a clear reconnect message if the dashboard still cannot load.
 - Cursor sync now prefers the dashboard `get-current-period-usage` response instead of unrelated page JSON or DOM text.

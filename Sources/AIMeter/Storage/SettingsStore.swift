@@ -65,7 +65,10 @@ final class SettingsStore: ObservableObject {
         var updated = settings
         var menuBar = updated.menuBar.normalized()
 
-        if !enabled, !menuBar.showCursorAutoAPIPercentages, !menuBar.showOpenAICodexPercentages {
+        if !enabled,
+           !menuBar.showCursorAutoAPIPercentages,
+           !menuBar.showClaudeUsagePercentages,
+           !menuBar.showOpenAICodexPercentages {
             menuBar.showCursorAutoAPIPercentages = true
         }
 
@@ -78,7 +81,10 @@ final class SettingsStore: ObservableObject {
         var updated = settings
         var menuBar = updated.menuBar.normalized()
 
-        if !enabled, !menuBar.showProgressBar, !menuBar.showOpenAICodexPercentages {
+        if !enabled,
+           !menuBar.showProgressBar,
+           !menuBar.showClaudeUsagePercentages,
+           !menuBar.showOpenAICodexPercentages {
             menuBar.showProgressBar = true
         }
 
@@ -87,11 +93,30 @@ final class SettingsStore: ObservableObject {
         settings = updated
     }
 
+    func setShowClaudeUsagePercentages(_ enabled: Bool) {
+        var updated = settings
+        var menuBar = updated.menuBar.normalized()
+
+        if !enabled,
+           !menuBar.showProgressBar,
+           !menuBar.showCursorAutoAPIPercentages,
+           !menuBar.showOpenAICodexPercentages {
+            menuBar.showProgressBar = true
+        }
+
+        menuBar.showClaudeUsagePercentages = enabled
+        updated.menuBar = menuBar.normalized()
+        settings = updated
+    }
+
     func setShowOpenAICodexPercentages(_ enabled: Bool) {
         var updated = settings
         var menuBar = updated.menuBar.normalized()
 
-        if !enabled, !menuBar.showProgressBar, !menuBar.showCursorAutoAPIPercentages {
+        if !enabled,
+           !menuBar.showProgressBar,
+           !menuBar.showCursorAutoAPIPercentages,
+           !menuBar.showClaudeUsagePercentages {
             menuBar.showProgressBar = true
         }
 

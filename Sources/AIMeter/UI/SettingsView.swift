@@ -49,7 +49,9 @@ struct SettingsView: View {
             providerSettingsSection(
                 snapshot: state.claudeSnapshot,
                 coordinator: claudeUsageCoordinator,
-                localSessionDescription: "AIMeter uses a local Claude web session stored in this app. No API key is required."
+                localSessionDescription: "AIMeter uses a local Claude web session stored in this app. No API key is required.",
+                showMenuBarPercentagesToggle: true,
+                menuBarPercentagesToggleTitle: "Show Claude 5-hour & Weekly percentages in Menu Bar"
             )
 
             providerSettingsSection(
@@ -122,6 +124,13 @@ struct SettingsView: View {
         )
     }
 
+    private var showClaudeUsagePercentagesBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.menuBar.showClaudeUsagePercentages },
+            set: { settingsStore.setShowClaudeUsagePercentages($0) }
+        )
+    }
+
     private func providerSettingsSection(
         snapshot: ProviderUsageSnapshot,
         coordinator: ProviderUsageCoordinator,
@@ -176,7 +185,7 @@ struct SettingsView: View {
         case .openai:
             return showOpenAICodexPercentagesBinding
         case .claude:
-            return .constant(false)
+            return showClaudeUsagePercentagesBinding
         }
     }
 

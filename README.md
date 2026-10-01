@@ -4,7 +4,7 @@
 
 AIMeter is a minimal macOS menu bar app for tracking personal Cursor, Claude, and OpenAI usage from authenticated local web sessions. It gives you a quiet, glanceable dashboard for the usage numbers that usually live several clicks deep in provider settings.
 
-> AIMeter is an experimental, unofficial Cursor, Claude, and OpenAI integration. It does not use provider APIs, and it may need updates when provider account pages change.
+> AIMeter is an experimental, unofficial Cursor, Claude, and OpenAI integration. It does not require provider API keys or send usage data to an AIMeter server, and it may need updates when provider account pages change.
 
 ![AIMeter menu bar dashboard screenshot](docs/screenshots/menu-popover.png)
 
@@ -16,7 +16,7 @@ AIMeter is a minimal macOS menu bar app for tracking personal Cursor, Claude, an
 - Tracks OpenAI ChatGPT Plus Codex usage: weekly limit and credits from the Codex analytics page.
 - Uses local web sessions, so no API key is required.
 - Keeps the latest successful usage snapshot visible if a background refresh fails.
-- Optional menu bar display of Cursor Auto and API usage percentages, or OpenAI weekly usage, beside the progress bar, or instead of it when the progress bar is hidden in Settings.
+- Optional menu bar display of Cursor Auto and API usage percentages, Claude 5-hour and weekly usage percentages, or OpenAI weekly usage, beside the progress bar, or instead of it when the progress bar is hidden in Settings.
 
 ## Screenshots
 
@@ -30,7 +30,7 @@ The screenshots show the current macOS menu bar dashboard and settings window.
 
 ### Download The App
 
-1. Open the latest [GitHub Release](https://github.com/divyanshub024/aimeter/releases).
+1. Open the latest [GitHub Release](https://github.com/acceleroto/aimeter/releases/latest).
 2. Download `AIMeter.dmg`.
 3. Open the DMG.
 4. Drag `AIMeter` into `Applications`.
@@ -75,7 +75,7 @@ Disconnecting a provider from AIMeter clears that provider's local sign-in data.
 | Provider | Metrics | Source page |
 | --- | --- | --- |
 | Cursor | Plan label, total usage percentage, Auto usage percentage, API usage percentage | [cursor.com/dashboard/spending](https://cursor.com/dashboard/spending) |
-| Claude | Plan label, session usage percentage, reset time, All models usage, Claude Design usage | [claude.ai/settings/usage](https://claude.ai/settings/usage) |
+| Claude | Plan label, session and weekly usage percentages, reset times, All models usage, Claude Design usage | [claude.ai/settings/usage](https://claude.ai/settings/usage) |
 | OpenAI | Plan label (e.g. ChatGPT Plus), Codex weekly usage %, credits balance, weekly reset time | [Codex analytics](https://chatgpt.com/codex/cloud/settings/analytics) |
 
 Cursor usage comes from the spending dashboard's included-usage block and its `get-current-period-usage` response, not the Cursor desktop app API or an AIMeter server.

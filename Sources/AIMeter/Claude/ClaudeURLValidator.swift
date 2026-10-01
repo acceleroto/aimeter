@@ -41,9 +41,44 @@ enum ClaudeURLValidator {
             return false
         }
 
-        return url.path(percentEncoded: false)
+        let path = url.path(percentEncoded: false)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            .lowercased() == "settings/usage"
+            .lowercased()
+        if path == "settings/usage" {
+            return true
+        }
+
+        // Claude can render usage settings as a modal over the app shell and
+        // move the route into the URL fragment.
+        let fragment = (url.fragment(percentEncoded: false) ?? "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        return fragment.hasPrefix("settings/usage")
+    }
+
+    /// The email sign-in flow (including verification-code entry) stays on
+    /// auth routes. Never treat one of these pages as the signed-in app shell.
+    static func isAuthFlowURLString(_ rawURL: String) -> Bool {
+        guard let url = URL(string: rawURL), isAllowedClaudeURL(url) else {
+            return false
+        }
+
+        let path = url.path(percentEncoded: false)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        let authFlowRoots = [
+            "login",
+            "logout",
+            "magic-link",
+            "verify",
+            "sso-callback",
+            "oauth",
+            "onboarding",
+            "device-code-verify"
+        ]
+        return authFlowRoots.contains { root in
+            path == root || path.hasPrefix("\(root)/")
+        }
     }
 
     static func isAllowedClaudeURL(_ url: URL) -> Bool {

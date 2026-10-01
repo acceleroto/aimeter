@@ -44,6 +44,16 @@ final class DisplayFormattingTests: XCTestCase {
         XCTAssertEqual(DisplayFormatting.resetDisplay(from: "Next billing date in 17 days"), "Resets in 17 days")
     }
 
+    func testResetDateDisplayParsesMicrosecondISO8601Timestamp() {
+        let display = DisplayFormatting.resetDateDisplay(
+            from: "2026-10-01T08:00:32.340430+00:00"
+        )
+
+        XCTAssertTrue(display?.hasPrefix("Resets ") == true)
+        XCTAssertFalse(display?.contains("T") == true)
+        XCTAssertFalse(display?.contains("+00:00") == true)
+    }
+
     func testResetInDaysUsesCalendarDayBoundaries() {
         let reference = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27, hour: 23, minute: 30))!
         let reset = Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 8))!

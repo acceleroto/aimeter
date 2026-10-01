@@ -122,6 +122,31 @@ final class ClaudeDashboardParserTests: XCTestCase {
         XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "Limit" })
     }
 
+    func testParsesWeeklyMeterWhenClaudeLabelsItWeekly() {
+        let text = """
+        Settings
+        Plan usage limits
+        Pro
+        Current session
+        25%
+        Weekly
+        32%
+        Claude Design
+        100%
+        """
+
+        let result = ClaudeDashboardParser.parseDOMText(text, sourceURL: "https://claude.ai/settings/usage")
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected Claude's weekly meter to parse from its Weekly label.")
+        }
+
+        XCTAssertEqual(snapshot.primaryMetric.title, "Current session")
+        XCTAssertEqual(snapshot.primaryMetric.percent, 25)
+        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "All models" }?.percent, 32)
+        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Claude Design" }?.percent, 100)
+    }
+
     func testDeduplicatesRepeatedSettingsUsageRows() {
         let text = """
         Settings
@@ -309,6 +334,48 @@ final class ClaudeDashboardParserTests: XCTestCase {
         XCTAssertEqual(snapshot.provider, .claude)
         XCTAssertEqual(snapshot.planLabel, "Claude Pro")
         XCTAssertEqual(snapshot.progressPercent ?? -1, 72, accuracy: 0.01)
+    }
+
+    func testParsesClaudeUsageWindowJSON() {
+        let payload = """
+        {
+          "plan": "Claude Max",
+          "five_hour": {
+            "utilization": 0.32,
+            "resets_at": "2026-10-01T08:20:00.340430+00:00"
+          },
+          "seven_day": {
+            "utilization": 0.57,
+            "resets_at": "2026-10-03T08:20:00.340451+00:00"
+          }
+        }
+        """
+
+        let result = ClaudeDashboardParser.parseResponseBody(
+            payload,
+            sourceURL: "https://claude.ai/api/organizations/org-123/usage"
+        )
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected Claude usage window JSON to parse.")
+        }
+
+        XCTAssertEqual(snapshot.planLabel, "Claude Max")
+        XCTAssertEqual(snapshot.primaryMetric.title, "Current session")
+        XCTAssertEqual(snapshot.primaryMetric.percent ?? -1, 32, accuracy: 0.01)
+        XCTAssertEqual(
+            snapshot.secondaryMetrics.first { $0.title == "All models" }?.percent ?? -1,
+            57,
+            accuracy: 0.01
+        )
+        XCTAssertTrue(snapshot.secondaryMetrics.contains { $0.title == "Reset" })
+        XCTAssertTrue(snapshot.secondaryMetrics.contains { $0.title == "All models reset" })
+        XCTAssertFalse(
+            snapshot.secondaryMetrics.first { $0.title == "Reset" }?.value.contains("T") == true
+        )
+        XCTAssertFalse(
+            snapshot.secondaryMetrics.first { $0.title == "All models reset" }?.value.contains("+00:00") == true
+        )
     }
 
     func testRejectsClaudeTemplatePayloadWithoutVisibleUsagePercent() {

@@ -150,7 +150,8 @@ final class MenuBarController: NSObject {
         let display = MenuBarDisplayResolver.resolve(
             menuBar: settings.menuBar,
             cursorSnapshot: state.cursorSnapshot,
-            openAISnapshot: state.openaiSnapshot
+            openAISnapshot: state.openaiSnapshot,
+            claudeSnapshot: state.claudeSnapshot
         )
 
         if display.showProgressBarImage {
@@ -217,6 +218,23 @@ final class MenuBarController: NSObject {
                 lines.append(
                     "Cursor Auto: \(DisplayFormatting.displayPercent(used: cursor.autoUsedPercent, countDown: settings.menuBar.countDownPercentages)), API: \(DisplayFormatting.displayPercent(used: cursor.apiUsedPercent, countDown: settings.menuBar.countDownPercentages))"
                 )
+            }
+        }
+
+        if settings.menuBar.showClaudeUsagePercentages {
+            let claude = state.claudeSnapshot
+            if
+                claude.connectionState != .disconnected,
+                claude.hasSuccessfulSync,
+                claude.claudeFiveHourPercent != nil || claude.claudeWeeklyPercent != nil
+            {
+                let fiveHour = claude.claudeFiveHourPercent.map {
+                    DisplayFormatting.displayPercent(used: $0, countDown: settings.menuBar.countDownPercentages)
+                } ?? "--"
+                let weekly = claude.claudeWeeklyPercent.map {
+                    DisplayFormatting.displayPercent(used: $0, countDown: settings.menuBar.countDownPercentages)
+                } ?? "--"
+                lines.append("Claude 5-hour: \(fiveHour), Weekly: \(weekly)")
             }
         }
 

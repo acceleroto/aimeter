@@ -19,18 +19,21 @@ struct MenuBarDisplay: Equatable {
 
 enum MenuBarDisplayResolver {
     static let placeholderSuffix = "--/--"
+    static let claudePlaceholderSuffix = "--/--"
     static let openAIPlaceholderSuffix = "--"
     static let segmentSeparator = " | "
 
     static func resolve(
         menuBar: MenuBarAppearanceSettings,
         cursorSnapshot: ProviderUsageSnapshot,
-        openAISnapshot: ProviderUsageSnapshot
+        openAISnapshot: ProviderUsageSnapshot,
+        claudeSnapshot: ProviderUsageSnapshot = .claudeDisconnected
     ) -> MenuBarDisplay {
         let settings = menuBar.normalized()
         let titleText = resolvedTitleText(
             settings: settings,
             cursorSnapshot: cursorSnapshot,
+            claudeSnapshot: claudeSnapshot,
             openAISnapshot: openAISnapshot
         )
 
@@ -43,6 +46,7 @@ enum MenuBarDisplayResolver {
     private static func resolvedTitleText(
         settings: MenuBarAppearanceSettings,
         cursorSnapshot: ProviderUsageSnapshot,
+        claudeSnapshot: ProviderUsageSnapshot,
         openAISnapshot: ProviderUsageSnapshot
     ) -> String {
         var segments: [String] = []
@@ -51,6 +55,16 @@ enum MenuBarDisplayResolver {
             segments.append(
                 cursorSegment(
                     from: cursorSnapshot,
+                    showPlaceholderWhenEmpty: !settings.showProgressBar,
+                    countDown: settings.countDownPercentages
+                )
+            )
+        }
+
+        if settings.showClaudeUsagePercentages {
+            segments.append(
+                claudeSegment(
+                    from: claudeSnapshot,
                     showPlaceholderWhenEmpty: !settings.showProgressBar,
                     countDown: settings.countDownPercentages
                 )
@@ -80,6 +94,27 @@ enum MenuBarDisplayResolver {
         }
 
         return showPlaceholderWhenEmpty ? placeholderSuffix : ""
+    }
+
+    private static func claudeSegment(
+        from snapshot: ProviderUsageSnapshot,
+        showPlaceholderWhenEmpty: Bool,
+        countDown: Bool
+    ) -> String {
+        if
+            snapshot.provider == .claude,
+            snapshot.connectionState != .disconnected,
+            snapshot.hasSuccessfulSync,
+            snapshot.claudeFiveHourPercent != nil || snapshot.claudeWeeklyPercent != nil
+        {
+            return DisplayFormatting.menuBarClaudeUsageSuffix(
+                fiveHour: snapshot.claudeFiveHourPercent,
+                weekly: snapshot.claudeWeeklyPercent,
+                countDown: countDown
+            )
+        }
+
+        return showPlaceholderWhenEmpty ? claudePlaceholderSuffix : ""
     }
 
     private static func openAISegment(

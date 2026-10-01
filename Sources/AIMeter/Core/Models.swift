@@ -3,6 +3,7 @@ import Foundation
 struct MenuBarAppearanceSettings: Codable, Equatable {
     var showProgressBar: Bool
     var showCursorAutoAPIPercentages: Bool
+    var showClaudeUsagePercentages: Bool
     var showOpenAICodexPercentages: Bool
     /// When true, percentage labels show remaining capacity (counting down) instead of usage used.
     var countDownPercentages: Bool
@@ -10,6 +11,7 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case showProgressBar
         case showCursorAutoAPIPercentages
+        case showClaudeUsagePercentages
         case showOpenAICodexPercentages
         case countDownPercentages
     }
@@ -17,11 +19,13 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
     init(
         showProgressBar: Bool,
         showCursorAutoAPIPercentages: Bool,
+        showClaudeUsagePercentages: Bool = false,
         showOpenAICodexPercentages: Bool = false,
         countDownPercentages: Bool = false
     ) {
         self.showProgressBar = showProgressBar
         self.showCursorAutoAPIPercentages = showCursorAutoAPIPercentages
+        self.showClaudeUsagePercentages = showClaudeUsagePercentages
         self.showOpenAICodexPercentages = showOpenAICodexPercentages
         self.countDownPercentages = countDownPercentages
     }
@@ -33,6 +37,10 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
             Bool.self,
             forKey: .showCursorAutoAPIPercentages
         ) ?? Self.default.showCursorAutoAPIPercentages
+        showClaudeUsagePercentages = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .showClaudeUsagePercentages
+        ) ?? Self.default.showClaudeUsagePercentages
         showOpenAICodexPercentages = try container.decodeIfPresent(
             Bool.self,
             forKey: .showOpenAICodexPercentages
@@ -46,12 +54,16 @@ struct MenuBarAppearanceSettings: Codable, Equatable {
     static let `default` = MenuBarAppearanceSettings(
         showProgressBar: true,
         showCursorAutoAPIPercentages: false,
+        showClaudeUsagePercentages: false,
         showOpenAICodexPercentages: false,
         countDownPercentages: false
     )
 
     var hasAtLeastOneDisplayOption: Bool {
-        showProgressBar || showCursorAutoAPIPercentages || showOpenAICodexPercentages
+        showProgressBar
+            || showCursorAutoAPIPercentages
+            || showClaudeUsagePercentages
+            || showOpenAICodexPercentages
     }
 
     func normalized() -> MenuBarAppearanceSettings {
@@ -314,6 +326,22 @@ struct ProviderUsageSnapshot: Equatable {
         metricPercent(named: "API")
     }
 
+    var claudeFiveHourPercent: Double? {
+        optionalMetricPercent(
+            named: ["Current session", "5-hour", "5 hour", "5h"]
+        )
+    }
+
+    var claudeWeeklyPercent: Double? {
+        claudeWeeklyMetric?.percent
+    }
+
+    var claudeWeeklyMetric: UsageMetric? {
+        optionalMetric(
+            named: ["All models", "Weekly", "Weekly limit", "Weekly limits", "Weekly usage"]
+        )
+    }
+
     var weeklyPercent: Double? {
         if primaryMetric.title.caseInsensitiveCompare("Weekly") == .orderedSame {
             return primaryMetric.percent
@@ -359,6 +387,20 @@ struct ProviderUsageSnapshot: Equatable {
 
     private func metricPercent(named title: String) -> Double {
         secondaryMetrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }?.percent ?? 0
+    }
+
+    private func optionalMetricPercent(named titles: [String]) -> Double? {
+        optionalMetric(named: titles)?.percent
+    }
+
+    private func optionalMetric(named titles: [String]) -> UsageMetric? {
+        if titles.contains(where: { primaryMetric.title.caseInsensitiveCompare($0) == .orderedSame }) {
+            return primaryMetric
+        }
+
+        return secondaryMetrics.first { metric in
+            titles.contains { metric.title.caseInsensitiveCompare($0) == .orderedSame }
+        }
     }
 }
 

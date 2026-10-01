@@ -5,8 +5,21 @@ struct UsageMetricCardsRow: View {
     let metrics: [UsageMetric]
     let resetText: (UsageMetric) -> String?
     let percentText: (UsageMetric) -> String
+    let progressPercent: (UsageMetric) -> Double?
 
     @State private var rowHeight: CGFloat = 0
+
+    init(
+        metrics: [UsageMetric],
+        resetText: @escaping (UsageMetric) -> String?,
+        percentText: @escaping (UsageMetric) -> String,
+        progressPercent: @escaping (UsageMetric) -> Double? = { _ in nil }
+    ) {
+        self.metrics = metrics
+        self.resetText = resetText
+        self.percentText = percentText
+        self.progressPercent = progressPercent
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -14,7 +27,8 @@ struct UsageMetricCardsRow: View {
                 UsageMetricCard(
                     title: metric.title,
                     value: percentText(metric),
-                    subtitle: resetText(metric)
+                    subtitle: resetText(metric),
+                    progressPercent: progressPercent(metric)
                 )
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(
@@ -41,6 +55,7 @@ private struct UsageMetricCard: View {
     let title: String
     let value: String
     let subtitle: String?
+    let progressPercent: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -54,6 +69,11 @@ private struct UsageMetricCard: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
+
+            if let progressPercent {
+                ProgressView(value: progressPercent / 100)
+                    .tint(.blue)
+            }
 
             if let subtitle, !subtitle.isEmpty {
                 VStack(alignment: .leading, spacing: 1) {

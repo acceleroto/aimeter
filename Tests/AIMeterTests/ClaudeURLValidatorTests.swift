@@ -40,4 +40,61 @@ final class ClaudeURLValidatorTests: XCTestCase {
             "https://claude.ai/settings/usage"
         )
     }
+
+    func testIdentifiesPathAndFragmentUsageSettingsURLs() {
+        let usageURLs = [
+            "https://claude.ai/settings/usage",
+            "https://claude.ai/settings/usage/",
+            "https://claude.ai/new#settings/usage",
+            "https://claude.ai/new#/settings/usage",
+            "https://claude.ai/chat/abc123#settings/usage"
+        ]
+
+        for rawURL in usageURLs {
+            XCTAssertTrue(ClaudeURLValidator.isUsageSettingsURLString(rawURL), rawURL)
+        }
+
+        let nonUsageURLs = [
+            "https://claude.ai/new",
+            "https://claude.ai/settings/profile",
+            "https://claude.ai/new#settings/profile",
+            "https://example.com/new#settings/usage"
+        ]
+
+        for rawURL in nonUsageURLs {
+            XCTAssertFalse(ClaudeURLValidator.isUsageSettingsURLString(rawURL), rawURL)
+        }
+    }
+
+    func testIdentifiesClaudeAuthenticationFlowURLs() {
+        let authFlowURLs = [
+            "https://claude.ai/login",
+            "https://claude.ai/login/",
+            "https://claude.ai/login?from=logout",
+            "https://claude.ai/login/code",
+            "https://claude.ai/logout",
+            "https://claude.ai/magic-link",
+            "https://claude.ai/verify",
+            "https://claude.ai/verify/email",
+            "https://claude.ai/sso-callback",
+            "https://claude.ai/oauth/authorize",
+            "https://claude.ai/onboarding",
+            "https://claude.ai/device-code-verify"
+        ]
+
+        for rawURL in authFlowURLs {
+            XCTAssertTrue(ClaudeURLValidator.isAuthFlowURLString(rawURL), rawURL)
+        }
+
+        let nonAuthFlowURLs = [
+            "https://claude.ai",
+            "https://claude.ai/new",
+            "https://claude.ai/settings/usage",
+            "https://claude.ai/chat/abc123"
+        ]
+
+        for rawURL in nonAuthFlowURLs {
+            XCTAssertFalse(ClaudeURLValidator.isAuthFlowURLString(rawURL), rawURL)
+        }
+    }
 }

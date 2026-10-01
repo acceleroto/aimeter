@@ -237,6 +237,16 @@ struct MenuPopoverView: View {
                     },
                     percentText: { metric in
                         displayPercentText(for: metric)
+                    },
+                    progressPercent: { metric in
+                        guard
+                            snapshot.provider == .claude,
+                            metric.title.caseInsensitiveCompare("All models") == .orderedSame
+                        else {
+                            return nil
+                        }
+
+                        return metric.percent
                     }
                 )
             }
@@ -271,9 +281,13 @@ struct MenuPopoverView: View {
         let metrics = snapshot.secondaryMetrics.filter { $0.percent != nil }
         switch snapshot.provider {
         case .claude:
-            return ["All models", "Claude Design"].compactMap { title in
-                metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
+            let weeklyMetric = snapshot.claudeWeeklyMetric.map { metric in
+                UsageMetric(title: "All models", value: metric.value, percent: metric.percent)
             }
+            let claudeDesignMetric = metrics.first {
+                $0.title.caseInsensitiveCompare("Claude Design") == .orderedSame
+            }
+            return [weeklyMetric, claudeDesignMetric].compactMap { $0 }
         case .openai:
             return metrics.filter { $0.title.caseInsensitiveCompare("Weekly") == .orderedSame }
         case .cursor:
@@ -285,10 +299,20 @@ struct MenuPopoverView: View {
         let metrics = snapshot.secondaryMetrics.filter { $0.percent == nil }
         switch snapshot.provider {
         case .claude:
-            let titles = ["Reset", "All models reset", "Claude Design reset"]
-            return titles.compactMap { title in
-                metrics.first { $0.title.caseInsensitiveCompare(title) == .orderedSame }
+            let currentReset = metrics.first {
+                $0.title.caseInsensitiveCompare("Reset") == .orderedSame
             }
+            let weeklyReset = metrics.first { metric in
+                ["All models reset", "Weekly reset", "Weekly limits reset"].contains { title in
+                    metric.title.caseInsensitiveCompare(title) == .orderedSame
+                }
+            }.map { metric in
+                UsageMetric(title: "All models reset", value: metric.value)
+            }
+            let claudeDesignReset = metrics.first {
+                $0.title.caseInsensitiveCompare("Claude Design reset") == .orderedSame
+            }
+            return [currentReset, weeklyReset, claudeDesignReset].compactMap { $0 }
         case .openai:
             let titles = ["Weekly reset"]
             return titles.compactMap { title in
