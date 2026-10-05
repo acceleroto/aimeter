@@ -116,10 +116,15 @@ enum DisplayFormatting {
             return nil
         }
 
+        return resetDateDisplay(from: resetDate)
+    }
+
+    /// Formats an absolute reset date in the same style used by provider reset captions.
+    static func resetDateDisplay(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return "Resets \(formatter.string(from: resetDate))"
+        return "Resets \(formatter.string(from: date))"
     }
 
     /// Relative "Resets in X days" line to show beneath an absolute "Resets <date>" value.

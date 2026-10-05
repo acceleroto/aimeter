@@ -127,6 +127,27 @@ final class OpenAIWebViewScraper: NSObject {
         pollTimer = nil
     }
 
+    private func requestLatestUsage() {
+        let script = """
+        (() => {
+          const usageURL = new URL("/backend-api/wham/usage", window.location.origin).toString();
+          fetch(usageURL, {
+            credentials: "include",
+            cache: "no-store"
+          })
+            .then((response) => response.text().then((body) => ({ body, url: response.url || usageURL })))
+            .then((payload) => {
+              try {
+                window.webkit.messageHandlers.openAINetworkBridge.postMessage(payload);
+              } catch (_) {}
+            })
+            .catch(() => {});
+        })();
+        """
+
+        webView.evaluateJavaScript(script)
+    }
+
     private func pollDOM() async {
         guard !hasResolved else {
             return
@@ -667,6 +688,7 @@ extension OpenAIWebViewScraper: WKNavigationDelegate {
             webView.evaluateJavaScript(Self.openAILoginAssistantScript)
         }
         startPollingDOM()
+        requestLatestUsage()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

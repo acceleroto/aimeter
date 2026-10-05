@@ -80,7 +80,7 @@ Disconnecting a provider from AIMeter clears that provider's local sign-in data.
 
 Cursor usage comes from the spending dashboard's included-usage block and its `get-current-period-usage` response, not the Cursor desktop app API or an AIMeter server.
 
-OpenAI usage is read from the signed-in Codex analytics page, not the OpenAI API. Email login is recommended in the connection window; Google and Apple sign-in are blocked inside embedded WebViews.
+OpenAI usage is read from the signed-in Codex analytics page and its current usage response, not a public OpenAI API. Email login is recommended in the connection window; Google and Apple sign-in are blocked inside embedded WebViews.
 
 ## Privacy
 

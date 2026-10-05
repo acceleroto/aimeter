@@ -4,6 +4,12 @@ All notable changes to AIMeter will be documented in this file.
 
 This project follows semantic versioning while it is practical for a small macOS utility.
 
+## [0.6.1] - 2026-10-05
+
+### Fixed
+
+- OpenAI usage refresh now parses the current Codex `wham/usage` response and requests a fresh usage snapshot when the analytics page loads.
+
 ## [0.6.0] - 2026-09-30
 
 ### Added

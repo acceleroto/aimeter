@@ -130,6 +130,41 @@ final class OpenAIDashboardParserTests: XCTestCase {
         XCTAssertNil(snapshot.secondaryMetrics.first { $0.title == "5-hour" })
     }
 
+    func testParsesCurrentWhamRateLimitResponse() {
+        let body = """
+        {
+          "plan_type": "plus",
+          "rate_limit": {
+            "primary_window": {
+              "used_percent": 12,
+              "limit_window_seconds": 18000,
+              "reset_at": 1791000000
+            },
+            "secondary_window": {
+              "used_percent": 34,
+              "limit_window_seconds": 604800,
+              "reset_at": 1791400000
+            }
+          },
+          "credits": {
+            "balance": "$5.00"
+          }
+        }
+        """
+
+        let result = OpenAIDashboardParser.parseResponseBody(body, sourceURL: "https://chatgpt.com/backend-api/wham/usage")
+
+        guard case .usage(let snapshot) = result else {
+            return XCTFail("Expected current OpenAI usage response to parse.")
+        }
+
+        XCTAssertEqual(snapshot.planLabel, "ChatGPT Plus")
+        XCTAssertEqual(snapshot.primaryMetric.title, "Weekly")
+        XCTAssertEqual(snapshot.primaryMetric.percent ?? -1, 34, accuracy: 0.01)
+        XCTAssertEqual(snapshot.secondaryMetrics.first { $0.title == "Credits" }?.value, "$5.00")
+        XCTAssertTrue(snapshot.secondaryMetrics.contains { $0.title == "Weekly reset" })
+    }
+
     func testRejectsNonOpenAIHost() {
         let result = OpenAIDashboardParser.parseResponseBody(
             #"{"usage": 50}"#,

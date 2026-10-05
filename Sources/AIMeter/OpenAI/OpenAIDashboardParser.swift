@@ -473,6 +473,10 @@ enum OpenAIDashboardParser {
     }
 
     private static func snapshotFromJSONObject(_ object: Any) -> ProviderUsageSnapshot? {
+        if let snapshot = snapshotFromRateLimitPayload(object) {
+            return snapshot
+        }
+
         let leaves = DashboardParserSupport.numericLeaves(from: object)
         let weeklyPercent = percentFromJSONLeaves(leaves, keywords: ["week"])
         let fiveHourPercent = percentFromJSONLeaves(leaves, keywords: ["five", "hour"])
@@ -502,6 +506,191 @@ enum OpenAIDashboardParser {
             secondaryMetrics: secondaryMetrics,
             fetchedAt: Date(),
             connectionState: .connected
+        )
+    }
+
+    private static func snapshotFromRateLimitPayload(_ object: Any) -> ProviderUsageSnapshot? {
+        guard
+            let root = object as? [String: Any],
+            let rateLimit = (root["rate_limit"] as? [String: Any])
+                ?? (root["rateLimit"] as? [String: Any])
+        else {
+            return nil
+        }
+
+        let primaryWindow = (rateLimit["primary_window"] as? [String: Any])
+            ?? (rateLimit["primaryWindow"] as? [String: Any])
+        let secondaryWindow = (rateLimit["secondary_window"] as? [String: Any])
+            ?? (rateLimit["secondaryWindow"] as? [String: Any])
+        let selectedWindow = [secondaryWindow, primaryWindow]
+            .compactMap { $0 }
+            .first { isWeeklyWindow($0) }
+            ?? secondaryWindow
+            ?? primaryWindow
+
+        guard let selectedWindow, let usedPercent = usedPercent(from: selectedWindow["used_percent"] ?? selectedWindow["usedPercent"]) else {
+            return nil
+        }
+
+        var secondaryMetrics: [UsageMetric] = []
+        if let resetMetric = resetMetric(
+            from: selectedWindow,
+            title: "Weekly reset"
+        ) {
+            secondaryMetrics.append(resetMetric)
+        }
+        if let creditsMetric = creditsMetric(from: root["credits"]) {
+            secondaryMetrics.append(creditsMetric)
+        }
+
+        return ProviderUsageSnapshot(
+            provider: .openai,
+            planLabel: rateLimitPlanLabel(from: root),
+            primaryMetric: UsageMetric(
+                title: "Weekly",
+                value: DisplayFormatting.percent(usedPercent),
+                percent: usedPercent
+            ),
+            secondaryMetrics: secondaryMetrics,
+            fetchedAt: Date(),
+            connectionState: .connected
+        )
+    }
+
+    private static func isWeeklyWindow(_ window: [String: Any]) -> Bool {
+        let duration = numericValue(
+            window["limit_window_seconds"]
+                ?? window["window_duration_seconds"]
+                ?? window["windowDurationSecs"]
+        )
+        return duration.map { $0 >= 86_400 } ?? false
+    }
+
+    private static func usedPercent(from value: Any?) -> Double? {
+        let number: Double?
+        if let value = value as? NSNumber {
+            number = value.doubleValue
+        } else if let value = value as? String {
+            number = Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        } else {
+            number = nil
+        }
+
+        guard let number, number.isFinite else {
+            return nil
+        }
+
+        return min(max(number, 0), 100)
+    }
+
+    private static func resetMetric(
+        from window: [String: Any],
+        title: String
+    ) -> UsageMetric? {
+        guard let date = resetDate(from: window) else {
+            return nil
+        }
+
+        return UsageMetric(
+            title: title,
+            value: DisplayFormatting.resetDateDisplay(from: date)
+        )
+    }
+
+    private static func resetDate(from window: [String: Any]) -> Date? {
+        if let timestamp = numericValue(
+            window["reset_at"]
+                ?? window["resetAt"]
+        ) {
+            return date(fromUnixTimestamp: timestamp)
+        }
+
+        if let timestamp = (window["reset_at"] as? String)
+            ?? (window["resetAt"] as? String),
+           let numericTimestamp = Double(timestamp)
+        {
+            return date(fromUnixTimestamp: numericTimestamp)
+        }
+
+        if let resetAfter = numericValue(
+            window["reset_after_seconds"]
+                ?? window["resetAfterSeconds"]
+        ) {
+            return Date().addingTimeInterval(max(resetAfter, 0))
+        }
+
+        return nil
+    }
+
+    private static func date(fromUnixTimestamp timestamp: Double) -> Date? {
+        guard timestamp.isFinite, timestamp > 0 else {
+            return nil
+        }
+
+        let seconds = timestamp > 10_000_000_000 ? timestamp / 1_000 : timestamp
+        return Date(timeIntervalSince1970: seconds)
+    }
+
+    private static func numericValue(_ value: Any?) -> Double? {
+        if let value = value as? NSNumber {
+            return value.doubleValue
+        }
+
+        if let value = value as? String {
+            return Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        return nil
+    }
+
+    private static func creditsMetric(from value: Any?) -> UsageMetric? {
+        guard let credits = value as? [String: Any] else {
+            return nil
+        }
+
+        for key in ["balance", "remaining", "amount"] {
+            if let string = credits[key] as? String {
+                let normalized = DashboardParserSupport.normalizeWhitespace(string)
+                if !normalized.isEmpty {
+                    return UsageMetric(title: "Credits", value: normalized)
+                }
+            }
+
+            if let number = numericValue(credits[key]) {
+                return UsageMetric(
+                    title: "Credits",
+                    value: String(format: "$%.2f", number)
+                )
+            }
+        }
+
+        return nil
+    }
+
+    private static func rateLimitPlanLabel(from root: [String: Any]) -> String {
+        if let planType = root["plan_type"] as? String ?? root["planType"] as? String {
+            let normalized = planType.lowercased()
+            if normalized.contains("plus") {
+                return "ChatGPT Plus"
+            }
+            if normalized.contains("pro") {
+                return "ChatGPT Pro"
+            }
+            if normalized.contains("team") {
+                return "ChatGPT Team"
+            }
+            if normalized.contains("business") {
+                return "ChatGPT Business"
+            }
+            if normalized.contains("enterprise") {
+                return "ChatGPT Enterprise"
+            }
+        }
+
+        let leafText = DashboardParserSupport.jsonLeafStrings(from: root).joined(separator: "\n")
+        return planLabel(
+            from: DashboardParserSupport.normalizedLines(from: leafText),
+            text: leafText
         )
     }
 
